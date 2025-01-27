@@ -1,0 +1,128 @@
+enum Role {
+  ROOT
+  DOCTOR
+  STAFF
+}
+
+type User {
+  id: ID!
+  name: String!
+  email: String!
+  profilePic: String!
+  role: Role!
+}
+
+type Doctor {
+  user: User!
+  specialty: String!
+  documents: [String!]!
+}
+
+type AuthPayload {
+  token: String!
+  user: User!
+}
+
+input LoginInput {
+  email: String!
+  password: String!
+}
+
+input DoctorInput {
+  specialty: String!
+  documents: [String!]!
+  userId: ID!  # Reference to existing user
+}
+
+input UserInput {
+  name: String!
+  email: String!
+  profilePic: String!
+  password: String!
+}
+
+
+
+type MailBox {
+  id: ID!
+  email: String!
+  sent: [ID]! 
+  received: [ID]!
+  sentmails: [Mail]!
+  receivedEmails: [Mail]!
+
+}
+
+enum EmailType {
+  APPLICATION
+  NORMAL
+}
+
+type Mail {
+  id: ID!
+  sender: String!
+  receiver: String!
+  content: String!
+  documents: [String]!
+  type: EmailType!
+  createdAt: String!
+}
+
+input sendMailInput {
+  receiver: String!  
+  content: String! 
+  documents: [String]
+}
+
+type Room {
+  id: ID! 
+  messages: [Message]!
+  participants: [ID!]!
+}
+
+type Message {
+  content: String!
+  author: String!
+}
+
+input sendMessageInput {
+ content: String! 
+ roomId: String!
+}
+
+type Query {
+  me: User!
+  myDoctorProfile: Doctor
+  getEmailByID(id: ID!): Mail!
+  getMailBox: MailBox!
+  getRoom(roomId: String!): Room!
+}
+
+type Mutation {
+  login(input: LoginInput!): AuthPayload!
+  createDoctor(input: DoctorInput!): Doctor!
+  createRoot(input: UserInput!): User!
+  createStaff(input: UserInput!): User!
+  createTestUser(input:UserInput!): User!
+  sendApplication(input:sendMailInput!): Mail!
+  sendNormalMail(input:sendMailInput!): Mail!
+  startChat(participantId: String!): Room!
+  sendMessage(input:sendMessageInput!): Room!
+  closeRoom(roomid: String!): Room!
+  openRoom(roomid: String!): Room!
+}
+
+type MailBoxSubscriptionResponse {
+  sent: Mail  
+  received: Mail
+}
+
+type MessageSubscriptionResponse {
+  roomId: String!
+  message: Message! 
+}
+
+type Subscription {
+  MailBoxSubscription: MailBoxSubscriptionResponse! 
+  MessageBoxSubscription: MessageSubscriptionResponse!
+}
