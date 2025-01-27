@@ -4,6 +4,7 @@ import (
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/messaging"
 	"github.com/Qu-Ack/voyagehack_api/services/observers"
+	"github.com/Qu-Ack/voyagehack_api/services/upload"
 	"github.com/Qu-Ack/voyagehack_api/services/user"
 )
 
@@ -15,4 +16,5 @@ type Resolver struct {
 	ObserverService  *observers.ObserverService
 	MailService      *mail.MailService
 	MessagingService *messaging.MessagingService
+	UploadService    *upload.UploadService
 }

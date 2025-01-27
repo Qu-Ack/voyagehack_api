@@ -112,6 +112,7 @@ type ComplexityRoot struct {
 		GetEmailByID    func(childComplexity int, id string) int
 		GetMailBox      func(childComplexity int) int
 		GetRoom         func(childComplexity int, roomID string) int
+		GetS3Url        func(childComplexity int) int
 		Me              func(childComplexity int) int
 		MyDoctorProfile func(childComplexity int) int
 	}
@@ -155,6 +156,7 @@ type QueryResolver interface {
 	GetEmailByID(ctx context.Context, id string) (*model.Mail, error)
 	GetMailBox(ctx context.Context) (*model.MailBox, error)
 	GetRoom(ctx context.Context, roomID string) (*model.Room, error)
+	GetS3Url(ctx context.Context) (string, error)
 }
 type SubscriptionResolver interface {
 	MailBoxSubscription(ctx context.Context) (<-chan *model.MailBoxSubscriptionResponse, error)
@@ -510,6 +512,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.GetRoom(childComplexity, args["roomId"].(string)), true
+
+	case "Query.getS3Url":
+		if e.complexity.Query.GetS3Url == nil {
+			break
+		}
+
+		return e.complexity.Query.GetS3Url(childComplexity), true
 
 	case "Query.me":
 		if e.complexity.Query.Me == nil {
@@ -3273,6 +3282,50 @@ func (ec *executionContext) fieldContext_Query_getRoom(ctx context.Context, fiel
 	if fc.Args, err = ec.field_Query_getRoom_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
 		ec.Error(ctx, err)
 		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_getS3Url(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_getS3Url(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().GetS3Url(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_getS3Url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
 	}
 	return fc, nil
 }
@@ -6456,6 +6509,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_getRoom(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getS3Url":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getS3Url(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}

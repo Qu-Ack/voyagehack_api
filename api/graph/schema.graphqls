@@ -96,6 +96,7 @@ type Query {
   getEmailByID(id: ID!): Mail!
   getMailBox: MailBox!
   getRoom(roomId: String!): Room!
+  getS3Url: String!
 }
 
 type Mutation {

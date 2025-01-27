@@ -4,12 +4,14 @@ go 1.23.5
 
 require (
 	github.com/99designs/gqlgen v0.17.63
+	github.com/aws/aws-sdk-go v1.55.6
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gorilla/websocket v1.5.0
 	github.com/vektah/gqlparser/v2 v2.5.21
 	go.mongodb.org/mongo-driver v1.17.2
 	golang.org/x/crypto v0.31.0
+	golang.org/x/exp v0.0.0-20250106191152-7588d65b2ba8
 )
 
 require (
@@ -28,6 +30,7 @@ require (
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.7 // indirect
+	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.16.7 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.7 // indirect

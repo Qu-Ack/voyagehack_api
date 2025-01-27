@@ -413,6 +413,17 @@ func (r *queryResolver) GetRoom(ctx context.Context, roomID string) (*model.Room
 	}, nil
 }
 
+// GetS3Url is the resolver for the getS3Url field.
+func (r *queryResolver) GetS3Url(ctx context.Context) (string, error) {
+	_, ok := ctx.Value("user").(user.PublicUser)
+	if !ok {
+		return "", fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	return r.UploadService.GetPresignedURL()
+
+}
+
 // MailBoxSubscription is the resolver for the MailBoxSubscription field.
 func (r *subscriptionResolver) MailBoxSubscription(ctx context.Context) (<-chan *model.MailBoxSubscriptionResponse, error) {
 	authedUser, ok := ctx.Value("user").(user.PublicUser)
