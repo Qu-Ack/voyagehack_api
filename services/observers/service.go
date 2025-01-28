@@ -27,13 +27,15 @@ func (o *ObserverService) Subscribe(ctx context.Context, resourceId string, subs
 	defer o.mu.Unlock()
 
 	if _, exists := o.observers[resourceId]; !exists {
-		o.observers[resourceId] = &Subscriptions{}
+		o.observers[resourceId] = &Subscriptions{
+			Channels: make(map[string]interface{}),
+		}
 	}
 
 	var ch interface{}
 	switch subscriptionType {
 	case "MAIL":
-		ch = make(chan *MailBoxSubscriptionResopnse, 10)
+		ch = make(chan *MailBoxSubscriptionResponse, 10)
 		break
 	case "MESSAGE":
 		ch = make(chan *MessageSubscriptionResponse, 10)
@@ -66,7 +68,7 @@ func (o *ObserverService) UnSubscribe(resourceId string, subscriptionType string
 
 	switch subscriptionType {
 	case "MAIL":
-		close(observer.Channels[subscriptionType].(chan *MailBoxSubscriptionResopnse))
+		close(observer.Channels[subscriptionType].(chan *MailBoxSubscriptionResponse))
 		delete(observer.Channels, subscriptionType)
 	case "MESSAGE":
 		close(observer.Channels[subscriptionType].(chan *MessageSubscriptionResponse))
@@ -94,7 +96,7 @@ func (o *ObserverService) Publish(message interface{}, resourceId string, subscr
 
 	switch subscriptionType {
 	case "MAIL":
-		observer.Channels[subscriptionType].(chan *MailBoxSubscriptionResopnse) <- message.(*MailBoxSubscriptionResopnse)
+		observer.Channels[subscriptionType].(chan *MailBoxSubscriptionResponse) <- message.(*MailBoxSubscriptionResponse)
 	case "MESSAGE":
 		observer.Channels[subscriptionType].(chan *MessageSubscriptionResponse) <- message.(*MessageSubscriptionResponse)
 	}
@@ -105,7 +107,7 @@ func (o *ObserverService) SubscribeToMail(ctx context.Context, mailId string) in
 	return o.Subscribe(ctx, mailId, "MAIL")
 }
 
-func (o *ObserverService) PublishMail(receiver string, message *MailBoxSubscriptionResopnse) {
+func (o *ObserverService) PublishMail(receiver string, message *MailBoxSubscriptionResponse) {
 	o.Publish(message, receiver, "MAIL")
 }
 

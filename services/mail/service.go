@@ -40,6 +40,10 @@ func (m *MailService) SendApplication(ctx context.Context, mail *Mail) (*Mail, e
 
 }
 
+func (m *MailService) InitializeMailBox(ctx context.Context, mailId string) (*MailBox, error) {
+	return m.repo.createMailBox(ctx, mailId)
+}
+
 func (m *MailService) SendNormalMail(ctx context.Context, mail *Mail, requester user.PublicUser) (*Mail, error) {
 	if requester.Role == "PATIENT" {
 		return nil, errors.New("Can't send emails")

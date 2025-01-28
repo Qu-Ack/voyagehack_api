@@ -74,3 +74,51 @@ func (h *HospitalRepo) addDoctorToHospital(ctx context.Context, hospitalId primi
 	return &hospital, nil
 
 }
+
+func (h *HospitalRepo) checkRootUser(ctx context.Context, participantId primitive.ObjectID) (*Hospital, error) {
+	hospitalCollection := h.db.Collection("hospitals")
+
+	filter := bson.M{
+		"participants.roots": participantId,
+	}
+
+	var hospital Hospital
+	err := hospitalCollection.FindOne(ctx, filter).Decode(&hospital)
+	if err != nil {
+		return nil, err
+	}
+
+	return &hospital, nil
+}
+
+func (h *HospitalRepo) checkStaffUser(ctx context.Context, participantId primitive.ObjectID) (*Hospital, error) {
+	hospitalCollection := h.db.Collection("hospitals")
+
+	filter := bson.M{
+		"participants.staff": participantId,
+	}
+
+	var hospital Hospital
+	err := hospitalCollection.FindOne(ctx, filter).Decode(&hospital)
+	if err != nil {
+		return nil, err
+	}
+
+	return &hospital, nil
+}
+
+func (h *HospitalRepo) checkDoctorUser(ctx context.Context, participantId primitive.ObjectID) (*Hospital, error) {
+	hospitalCollection := h.db.Collection("hospitals")
+
+	filter := bson.M{
+		"participants.doctors": participantId,
+	}
+
+	var hospital Hospital
+	err := hospitalCollection.FindOne(ctx, filter).Decode(&hospital)
+	if err != nil {
+		return nil, err
+	}
+
+	return &hospital, nil
+}

@@ -1,6 +1,7 @@
 package upload
 
 import (
+	"fmt"
 	"log"
 	"time"
 
@@ -40,6 +41,7 @@ func GenerateImageName(length int) string {
 }
 
 func (u *UploadService) GetPresignedURL() (string, error) {
+	fmt.Println("in service upload")
 	imageName := GenerateImageName(8)
 
 	req, _ := u.svc.PutObjectRequest(&s3.PutObjectInput{
@@ -48,6 +50,7 @@ func (u *UploadService) GetPresignedURL() (string, error) {
 	})
 
 	str, err := req.Presign(15 * time.Minute)
+	fmt.Println(str)
 
 	if err != nil {
 		log.Println("ERROR: GetPresignURL", err)

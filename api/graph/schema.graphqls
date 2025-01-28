@@ -39,9 +39,16 @@ input UserInput {
   email: String!
   profilePic: String!
   password: String!
+  hospitalId: String!
 }
 
-
+input TestUserInput {
+  name: String!
+  email: String!
+  profilePic: String!
+  password: String!
+  role: String!
+}
 
 type MailBox {
   id: ID!
@@ -99,6 +106,16 @@ input sendMessageInput {
  roomId: String!
 }
 
+type Hospital {
+  participants: Participants 
+}
+
+type Participants {
+  roots: [String!]!
+  staff: [String!]!
+  doctors: [String!]!
+}
+
 type Query {
   me: User!
   myDoctorProfile: Doctor
@@ -107,6 +124,7 @@ type Query {
   getRoom(roomId: String!): Room!
   getS3Url: String!
   getOrderId: String!
+  getHospital: Hospital!
 }
 
 type Mutation {
@@ -114,13 +132,14 @@ type Mutation {
   createDoctor(input: DoctorInput!): Doctor!
   createRoot(input: UserInput!): User!
   createStaff(input: UserInput!): User!
-  createTestUser(input:UserInput!): User!
+  createTestUser(input:TestUserInput!): User!
   sendApplication(input:sendMailInput!): Mail!
   sendNormalMail(input:sendNormalMailInput!): Mail!
   startChat(participantId: String!): Room!
   sendMessage(input:sendMessageInput!): Room!
   closeRoom(roomid: String!): Room!
   openRoom(roomid: String!): Room!
+  addToHospital(userMail: String!, hospitalId: String!):Hospital!
 }
 
 type MailBoxSubscriptionResponse {

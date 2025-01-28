@@ -10,6 +10,16 @@ import (
 	"golang.org/x/exp/rand"
 )
 
+type AuthenticatedUser struct {
+	ID    string
+	Email string
+	Role  string
+}
+
+type contextKey string
+
+const UserContextKey contextKey = "user"
+
 func convertObjectIDToStringSlice(ids []primitive.ObjectID) []*string {
 	result := make([]*string, len(ids))
 	for i, id := range ids {

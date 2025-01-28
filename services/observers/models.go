@@ -2,7 +2,7 @@ package observers
 
 import "go.mongodb.org/mongo-driver/bson/primitive"
 
-type MailBoxSubscriptionResopnse struct {
+type MailBoxSubscriptionResponse struct {
 	Sent     Mail `json:"sent"`
 	Received Mail `json:"received"`
 }

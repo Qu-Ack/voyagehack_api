@@ -25,6 +25,10 @@ type DoctorInput struct {
 	UserID    string   `json:"userId"`
 }
 
+type Hospital struct {
+	Participants *Participants `json:"participants,omitempty"`
+}
+
 type LoginInput struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
@@ -67,6 +71,12 @@ type MessageSubscriptionResponse struct {
 type Mutation struct {
 }
 
+type Participants struct {
+	Roots   []string `json:"roots"`
+	Staff   []string `json:"staff"`
+	Doctors []string `json:"doctors"`
+}
+
 type Query struct {
 }
 
@@ -77,6 +87,14 @@ type Room struct {
 }
 
 type Subscription struct {
+}
+
+type TestUserInput struct {
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	ProfilePic string `json:"profilePic"`
+	Password   string `json:"password"`
+	Role       string `json:"role"`
 }
 
 type User struct {
@@ -92,6 +110,7 @@ type UserInput struct {
 	Email      string `json:"email"`
 	ProfilePic string `json:"profilePic"`
 	Password   string `json:"password"`
+	HospitalID string `json:"hospitalId"`
 }
 
 type SendMailInput struct {

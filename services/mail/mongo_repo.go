@@ -83,6 +83,22 @@ func (m *MailRepo) AddMailToReceived(ctx context.Context, mailId string, mail pr
 	return nil
 }
 
+func (m *MailRepo) createMailBox(ctx context.Context, mailId string) (*MailBox, error) {
+	mailBoxCollection := m.db.Collection("mailbox")
+
+	mailbox := MailBox{
+		Email: mailId,
+	}
+
+	_, err := mailBoxCollection.InsertOne(ctx, mailbox)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &mailbox, nil
+}
+
 func (m *MailRepo) AddMailsToMailBox(ctx context.Context, mailBoxId primitive.ObjectID) (*PublicMailBox, error) {
 	mailBoxCollection := m.db.Collection("mailbox")
 	pipeline := mongo.Pipeline{

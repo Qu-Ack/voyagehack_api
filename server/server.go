@@ -15,6 +15,7 @@ import (
 	"github.com/Qu-Ack/voyagehack_api/api/graph"
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/observers"
+	"github.com/Qu-Ack/voyagehack_api/services/upload"
 	"github.com/Qu-Ack/voyagehack_api/services/user"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
@@ -28,10 +29,8 @@ type Server struct {
 	mongoClient *mongo.Client
 }
 
-type contextKey string
-
 const (
-	userContextKey = contextKey("user")
+	userContextKey = "user"
 )
 
 func New() (*http.Server, error) {
@@ -56,26 +55,76 @@ func New() (*http.Server, error) {
 	mailRepo := mail.NewMailRepo(db)
 	mailService := mail.NewMailService(mailRepo)
 
+	uploadService, err := upload.NewUploadService()
+
+	if err != nil {
+		fmt.Println(err)
+		panic("couldn't initialize upload service")
+	}
+
 	// GraphQL handler
 	srv := handler.New(graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
 			UserService:     userService,
 			ObserverService: observerService,
 			MailService:     mailService,
+			UploadService:   uploadService,
 		},
 	}))
 
-	srv.AddTransport(transport.GET{})
-	srv.AddTransport(transport.POST{})
-	srv.AddTransport(transport.Options{})
-	srv.AddTransport(transport.Websocket{
+	srv.AddTransport(&transport.Websocket{
 		KeepAlivePingInterval: 10 * time.Second,
 		Upgrader: websocket.Upgrader{
 			CheckOrigin: func(r *http.Request) bool {
 				return true
 			},
+			EnableCompression: true,
+		},
+		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
+			// Try to get token from payload
+			if auth, ok := initPayload["Authorization"].(string); ok {
+				token := strings.TrimPrefix(auth, "Bearer ")
+				fmt.Println(token)
+
+				// Validate token
+				parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
+					return []byte("tryandbruteforcethisbitch"), nil
+				})
+
+				if err != nil || !parsedToken.Valid {
+					return ctx, nil, fmt.Errorf("invalid token")
+				}
+
+				claims, ok := parsedToken.Claims.(jwt.MapClaims)
+				if !ok {
+					return ctx, nil, fmt.Errorf("invalid claims")
+				}
+
+				// Create authenticated user
+				user := graph.AuthenticatedUser{
+					ID:    claims["id"].(string),
+					Email: claims["email"].(string),
+					Role:  claims["role"].(string),
+				}
+
+				// Store user in context and return modified payload
+				return context.WithValue(ctx, graph.UserContextKey, user), &initPayload, nil
+			}
+
+			// Handle test token if present
+			if testToken, ok := initPayload["TestToken"].(string); ok {
+				if testToken == "tryandbruteforcethisbitch" {
+					return context.WithValue(ctx, graph.UserContextKey, "yes"), &initPayload, nil
+				}
+			}
+
+			return ctx, &initPayload, nil
 		},
 	})
+
+	srv.AddTransport(transport.GET{})
+	srv.AddTransport(transport.POST{})
+	srv.AddTransport(transport.Options{})
 	srv.AddTransport(transport.GRAPHQL{})
 
 	router.GET("/", func(c *gin.Context) {
@@ -83,6 +132,9 @@ func New() (*http.Server, error) {
 	})
 	router.POST("/query", func(c *gin.Context) {
 		srv.ServeHTTP(c.Writer, c.Request)
+	})
+	router.GET("/query", func(ctx *gin.Context) {
+		srv.ServeHTTP(ctx.Writer, ctx.Request)
 	})
 
 	return &http.Server{
@@ -96,6 +148,7 @@ func connectMongoDB() (*mongo.Client, error) {
 	defer cancel()
 
 	uri := os.Getenv("MONGO_URI")
+	fmt.Println(uri)
 	if uri == "" {
 		uri = "mongodb://localhost:27017"
 	}
@@ -115,12 +168,6 @@ func connectMongoDB() (*mongo.Client, error) {
 	return client, nil
 }
 
-type AuthenticatedUser struct {
-	ID    string
-	Email string
-	Role  string
-}
-
 // GinContextToContextMiddleware converts Gin context to standard context
 func GinContextToContextMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -131,71 +178,68 @@ func GinContextToContextMiddleware() gin.HandlerFunc {
 }
 
 func AuthTokenMiddleware() gin.HandlerFunc {
-	return func(ctx *gin.Context) {
-		AuthToken := ctx.Request.Header.Get("Authorization")
+	return func(c *gin.Context) {
+		var user graph.AuthenticatedUser
 
-		if AuthToken == "" {
-			fmt.Println("here")
-			testToken := ctx.Request.Header.Get("TestToken")
-			fmt.Println(testToken)
-
+		// Check for Authorization header
+		authToken := c.Request.Header.Get("Authorization")
+		if authToken == "" {
+			// Handle test token
+			testToken := c.Request.Header.Get("TestToken")
 			if testToken == "tryandbruteforcethisbitch" {
-				c := context.WithValue(ctx.Request.Context(), "testuser", "yes")
-				ctx.Request = ctx.Request.WithContext(c)
-				ctx.Next()
+				user := "yes"
+				ctx := context.WithValue(c.Request.Context(), graph.UserContextKey, user)
+				c.Request = c.Request.WithContext(ctx)
+				c.Next()
 				return
 			} else if testToken == "" {
-				ctx.Next()
+				c.Next()
 				return
 			}
 		}
 
-		tokenString := strings.TrimPrefix(AuthToken, "Bearer ")
-
-		if tokenString == AuthToken {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"errors": "invalid token"})
+		// Process JWT token
+		tokenString := strings.TrimPrefix(authToken, "Bearer ")
+		if tokenString == authToken {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
 			return
 		}
 
+		// Validate token
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
-			return "tryandbruteforcethisbitch", nil
+			return []byte("tryandbruteforcethisbitch"), nil
 		})
 
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"errors": "invalid token"})
-			return
-		}
-
-		if !token.Valid {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"errors": "invalid token"})
+		if err != nil || !token.Valid {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			return
 		}
 
 		claims, ok := token.Claims.(jwt.MapClaims)
-
 		if !ok {
-			ctx.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid claims"})
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid claims"})
 			return
 		}
 
-		user := AuthenticatedUser{
+		// Create authenticated user
+		user = graph.AuthenticatedUser{
 			ID:    claims["id"].(string),
 			Email: claims["email"].(string),
 			Role:  claims["role"].(string),
 		}
 
-		c := context.WithValue(ctx.Request.Context(), userContextKey, user)
-		ctx.Request = ctx.Request.WithContext(c)
-
-		ctx.Next()
-
+		// Store in context using the custom key
+		ctx := context.WithValue(c.Request.Context(), graph.UserContextKey, user)
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
 	}
 }
 
-func GetAuthenticatedUser(ctx context.Context) (*AuthenticatedUser, error) {
-	user, ok := ctx.Value(userContextKey).(AuthenticatedUser)
+func GetAuthenticatedUser(ctx context.Context) (*graph.AuthenticatedUser, error) {
+	user, ok := ctx.Value(userContextKey).(graph.AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
 	return &user, nil
+
 }

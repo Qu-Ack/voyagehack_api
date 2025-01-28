@@ -51,3 +51,36 @@ func (h *HospitalService) AddParticipant(ctx context.Context, participantType st
 	}
 
 }
+
+func (h *HospitalService) CheckParticpant(ctx context.Context, participantType string, participantId string) (*Hospital, error) {
+
+	participantObjectId, err := primitive.ObjectIDFromHex(participantId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	switch participantType {
+	case "ROOT":
+		hospital, err := h.repo.checkRootUser(ctx, participantObjectId)
+		if err != nil {
+			return nil, err
+		}
+		return hospital, nil
+	case "STAFF":
+		hospital, err := h.repo.checkStaffUser(ctx, participantObjectId)
+		if err != nil {
+			return nil, err
+		}
+		return hospital, nil
+	case "DOCTOR":
+		hospital, err := h.repo.checkDoctorUser(ctx, participantObjectId)
+		if err != nil {
+			return nil, err
+		}
+		return hospital, nil
+	default:
+		return nil, errors.New("participant Type should be Valid")
+
+	}
+}

@@ -49,7 +49,7 @@ func (r *mutationResolver) CreateDoctor(ctx context.Context, input model.DoctorI
 
 // CreateRoot is the resolver for the createRoot field.
 func (r *mutationResolver) CreateRoot(ctx context.Context, input model.UserInput) (*model.User, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -69,6 +69,17 @@ func (r *mutationResolver) CreateRoot(ctx context.Context, input model.UserInput
 		return nil, err
 	}
 
+	_, err = r.HospitalService.AddParticipant(ctx, "ROOT", publicUser.ID, input.HospitalID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.MailService.InitializeMailBox(ctx, publicUser.Email)
+	if err != nil {
+		return nil, err
+	}
+
 	return &model.User{
 		ID:         publicUser.ID,
 		Email:      publicUser.Email,
@@ -80,7 +91,7 @@ func (r *mutationResolver) CreateRoot(ctx context.Context, input model.UserInput
 
 // CreateStaff is the resolver for the createStaff field.
 func (r *mutationResolver) CreateStaff(ctx context.Context, input model.UserInput) (*model.User, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -92,9 +103,21 @@ func (r *mutationResolver) CreateStaff(ctx context.Context, input model.UserInpu
 		Password:   input.Password,
 	}, user.PublicUser{
 		ID:    authedUser.ID,
-		Role:  authedUser.Role,
+		Role:  user.Role(authedUser.Role),
 		Email: authedUser.Email,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.HospitalService.AddParticipant(ctx, "STAFF", publicUser.ID, input.HospitalID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.MailService.InitializeMailBox(ctx, publicUser.Email)
+
 	if err != nil {
 		return nil, err
 	}
@@ -109,8 +132,8 @@ func (r *mutationResolver) CreateStaff(ctx context.Context, input model.UserInpu
 }
 
 // CreateTestUser is the resolver for the createTestUser field.
-func (r *mutationResolver) CreateTestUser(ctx context.Context, input model.UserInput) (*model.User, error) {
-	_, ok := ctx.Value("testuser").(string)
+func (r *mutationResolver) CreateTestUser(ctx context.Context, input model.TestUserInput) (*model.User, error) {
+	_, ok := ctx.Value(UserContextKey).(string)
 
 	if !ok {
 		return nil, errors.New("not a test user")
@@ -120,8 +143,15 @@ func (r *mutationResolver) CreateTestUser(ctx context.Context, input model.UserI
 		Name:       input.Name,
 		Email:      input.Email,
 		ProfilePic: input.ProfilePic,
-		Role:       "ROOT",
+		Password:   input.Password,
+		Role:       user.Role(input.Role),
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.MailService.InitializeMailBox(ctx, publicUser.Email)
 
 	if err != nil {
 		return nil, err
@@ -138,7 +168,7 @@ func (r *mutationResolver) CreateTestUser(ctx context.Context, input model.UserI
 
 // SendApplication is the resolver for the sendApplication field.
 func (r *mutationResolver) SendApplication(ctx context.Context, input model.SendMailInput) (*model.Mail, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -147,7 +177,11 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 		RazorpayPaymentId: input.RazorpayPaymentID,
 		RazorpayOrderId:   input.RazorpayOrderID,
 		RazorpaySignature: input.RazorpaySignature,
-	}, authedUser)
+	}, user.PublicUser{
+		ID:    authedUser.ID,
+		Email: authedUser.Email,
+		Role:  user.Role(authedUser.Role),
+	})
 
 	if err != nil {
 		return nil, err
@@ -180,7 +214,7 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 		return nil, err
 	}
 
-	r.ObserverService.PublishMail(user.Email, &observers.MailBoxSubscriptionResopnse{
+	r.ObserverService.PublishMail(user.Email, &observers.MailBoxSubscriptionResponse{
 		Received: observers.Mail{
 			ID:        mail.ID,
 			Sender:    mail.Sender,
@@ -190,7 +224,7 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 			CreatedAt: mail.CreatedAt,
 		},
 	})
-	r.ObserverService.PublishMail(authedUser.Email, &observers.MailBoxSubscriptionResopnse{
+	r.ObserverService.PublishMail(authedUser.Email, &observers.MailBoxSubscriptionResponse{
 		Sent: observers.Mail{
 			ID:        mail.ID,
 			Sender:    mail.Sender,
@@ -213,7 +247,7 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 
 // SendNormalMail is the resolver for the sendNormalMail field.
 func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendNormalMailInput) (*model.Mail, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -225,13 +259,17 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 		Documents: input.Documents,
 		Type:      mail.Application,
 		CreatedAt: primitive.NewDateTimeFromTime(time.Now()),
-	}, authedUser)
+	}, user.PublicUser{
+		ID:    authedUser.ID,
+		Role:  user.Role(authedUser.Role),
+		Email: authedUser.Email,
+	})
 
 	if err != nil {
 		return nil, err
 	}
 
-	r.ObserverService.PublishMail(input.Receiver, &observers.MailBoxSubscriptionResopnse{
+	r.ObserverService.PublishMail(input.Receiver, &observers.MailBoxSubscriptionResponse{
 		Received: observers.Mail{
 			ID:        mail.ID,
 			Sender:    mail.Sender,
@@ -241,7 +279,7 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 			CreatedAt: mail.CreatedAt,
 		},
 	})
-	r.ObserverService.PublishMail(authedUser.Email, &observers.MailBoxSubscriptionResopnse{
+	r.ObserverService.PublishMail(authedUser.Email, &observers.MailBoxSubscriptionResponse{
 		Sent: observers.Mail{
 			ID:        mail.ID,
 			Sender:    mail.Sender,
@@ -265,12 +303,16 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 
 // StartChat is the resolver for the startChat field.
 func (r *mutationResolver) StartChat(ctx context.Context, participantID string) (*model.Room, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
 
-	room, err := r.MessagingService.CreateRoom(ctx, participantID, authedUser)
+	room, err := r.MessagingService.CreateRoom(ctx, participantID, user.PublicUser{
+		ID:    authedUser.ID,
+		Role:  user.Role(authedUser.Role),
+		Email: authedUser.Email,
+	})
 
 	if err != nil {
 		return nil, err
@@ -285,12 +327,16 @@ func (r *mutationResolver) StartChat(ctx context.Context, participantID string) 
 
 // SendMessage is the resolver for the sendMessage field.
 func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMessageInput) (*model.Room, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
 
-	room, err := r.MessagingService.SendMessage(ctx, input.RoomID, authedUser, &messaging.Message{
+	room, err := r.MessagingService.SendMessage(ctx, input.RoomID, user.PublicUser{
+		ID:    authedUser.ID,
+		Email: authedUser.Email,
+		Role:  user.Role(authedUser.Role),
+	}, &messaging.Message{
 		Content: input.Content,
 		Author:  authedUser.Email,
 	})
@@ -308,11 +354,15 @@ func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMess
 
 // CloseRoom is the resolver for the closeRoom field.
 func (r *mutationResolver) CloseRoom(ctx context.Context, roomid string) (*model.Room, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
-	room, err := r.MessagingService.ChangeRoomState(ctx, "CLOSE", authedUser, roomid)
+	room, err := r.MessagingService.ChangeRoomState(ctx, "CLOSE", user.PublicUser{
+		ID:    authedUser.ID,
+		Role:  user.Role(authedUser.Role),
+		Email: authedUser.Email,
+	}, roomid)
 
 	if err != nil {
 		return nil, err
@@ -327,11 +377,15 @@ func (r *mutationResolver) CloseRoom(ctx context.Context, roomid string) (*model
 
 // OpenRoom is the resolver for the openRoom field.
 func (r *mutationResolver) OpenRoom(ctx context.Context, roomid string) (*model.Room, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
-	room, err := r.MessagingService.ChangeRoomState(ctx, "OPEN", authedUser, roomid)
+	room, err := r.MessagingService.ChangeRoomState(ctx, "OPEN", user.PublicUser{
+		ID:    authedUser.ID,
+		Email: authedUser.Email,
+		Role:  user.Role(authedUser.Role),
+	}, roomid)
 
 	if err != nil {
 		return nil, err
@@ -344,9 +398,15 @@ func (r *mutationResolver) OpenRoom(ctx context.Context, roomid string) (*model.
 	}, nil
 }
 
+// AddToHospital is the resolver for the addToHospital field.
+func (r *mutationResolver) AddToHospital(ctx context.Context, userMail string, hospitalID string) (*model.Hospital, error) {
+	panic("not implemented")
+}
+
 // Me is the resolver for the me field.
 func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	fmt.Println(authedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -372,7 +432,7 @@ func (r *queryResolver) MyDoctorProfile(ctx context.Context) (*model.Doctor, err
 
 // GetEmailByID is the resolver for the getEmailByID field.
 func (r *queryResolver) GetEmailByID(ctx context.Context, id string) (*model.Mail, error) {
-	_, ok := ctx.Value("user").(user.PublicUser)
+	_, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -396,7 +456,7 @@ func (r *queryResolver) GetEmailByID(ctx context.Context, id string) (*model.Mai
 
 // GetMailBox is the resolver for the getMailBox field.
 func (r *queryResolver) GetMailBox(ctx context.Context) (*model.MailBox, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -423,11 +483,15 @@ func (r *queryResolver) GetMailBox(ctx context.Context) (*model.MailBox, error) 
 
 // GetRoom is the resolver for the getRoom field.
 func (r *queryResolver) GetRoom(ctx context.Context, roomID string) (*model.Room, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
-	room, err := r.MessagingService.GetRoom(ctx, roomID, authedUser)
+	room, err := r.MessagingService.GetRoom(ctx, roomID, user.PublicUser{
+		ID:    authedUser.ID,
+		Email: authedUser.Email,
+		Role:  user.Role(authedUser.Role),
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -440,7 +504,7 @@ func (r *queryResolver) GetRoom(ctx context.Context, roomID string) (*model.Room
 
 // GetS3Url is the resolver for the getS3Url field.
 func (r *queryResolver) GetS3Url(ctx context.Context) (string, error) {
-	_, ok := ctx.Value("user").(user.PublicUser)
+	_, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return "", fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -450,19 +514,77 @@ func (r *queryResolver) GetS3Url(ctx context.Context) (string, error) {
 
 // GetOrderID is the resolver for the getOrderId field.
 func (r *queryResolver) GetOrderID(ctx context.Context) (string, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return "", fmt.Errorf("unauthorized: user not found in context")
 	}
 
 	return r.PaymentService.NewOrder(&payment.OrderRequest{
 		Amount: 100,
-	}, authedUser)
+	}, user.PublicUser{
+		ID:    authedUser.ID,
+		Role:  user.Role(authedUser.Role),
+		Email: authedUser.Email,
+	})
+}
+
+// GetHospital is the resolver for the getHospital field.
+func (r *queryResolver) GetHospital(ctx context.Context) (*model.Hospital, error) {
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	switch user.Role(authedUser.Role) {
+	case user.RoleRoot:
+		hospital, err := r.HospitalService.CheckParticpant(ctx, "ROOT", authedUser.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		return &model.Hospital{
+			Participants: &model.Participants{
+				Roots:   convertParticipants(hospital.Participants.Roots),
+				Staff:   convertParticipants(hospital.Participants.Staff),
+				Doctors: convertParticipants(hospital.Participants.Doctors),
+			},
+		}, nil
+	case user.RoleDoctor:
+		hospital, err := r.HospitalService.CheckParticpant(ctx, "DOCTOR", authedUser.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		return &model.Hospital{
+			Participants: &model.Participants{
+				Roots:   convertParticipants(hospital.Participants.Roots),
+				Staff:   convertParticipants(hospital.Participants.Staff),
+				Doctors: convertParticipants(hospital.Participants.Doctors),
+			},
+		}, nil
+	case user.RoleStaff:
+		hospital, err := r.HospitalService.CheckParticpant(ctx, "STAFF", authedUser.ID)
+		if err != nil {
+			return nil, err
+		}
+
+		return &model.Hospital{
+			Participants: &model.Participants{
+				Roots:   convertParticipants(hospital.Participants.Roots),
+				Staff:   convertParticipants(hospital.Participants.Staff),
+				Doctors: convertParticipants(hospital.Participants.Doctors),
+			},
+		}, nil
+	default:
+		return nil, errors.New("invalid role")
+
+	}
 }
 
 // MailBoxSubscription is the resolver for the MailBoxSubscription field.
 func (r *subscriptionResolver) MailBoxSubscription(ctx context.Context) (<-chan *model.MailBoxSubscriptionResponse, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	fmt.Println("called")
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
@@ -472,7 +594,8 @@ func (r *subscriptionResolver) MailBoxSubscription(ctx context.Context) (<-chan 
 
 // MessageBoxSubscription is the resolver for the MessageBoxSubscription field.
 func (r *subscriptionResolver) MessageBoxSubscription(ctx context.Context) (<-chan *model.MessageSubscriptionResponse, error) {
-	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	fmt.Println("called")
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}

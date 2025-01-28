@@ -3,12 +3,10 @@ package user
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
@@ -34,11 +32,12 @@ func (u *UserService) CreateRoot(ctx context.Context, userInput UserInput, reque
 	}
 	userInput.Role = RoleRoot
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInput.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-	userInput.Password = string(hashedPassword)
+	// password hashing feature not working properly
+	//hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInput.Password), bcrypt.DefaultCost)
+	//if err != nil {
+	//return nil, err
+	//}
+	//userInput.Password = string(hashedPassword)
 
 	return u.repo.createUser(ctx, userInput)
 }
@@ -55,12 +54,13 @@ func (u *UserService) CreateStaff(ctx context.Context, userInput UserInput, requ
 
 	userInput.Role = RoleStaff
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInput.Password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
+	// password hashing feature not working properly
+	//hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInput.Password), bcrypt.DefaultCost)
+	//if err != nil {
+	//return nil, err
+	//}
 
-	userInput.Password = string(hashedPassword)
+	//userInput.Password = string(hashedPassword)
 
 	return u.repo.createUser(ctx, userInput)
 }
@@ -72,13 +72,8 @@ func (u *UserService) Login(ctx context.Context, loginInput LoginInput) (*AuthRe
 		return nil, errors.New("user doesn't exist")
 	}
 
-	fmt.Print(string(user.Password))
-	err = bcrypt.CompareHashAndPassword(
-		[]byte(user.Password),
-		[]byte(loginInput.Password),
-	)
-	if err != nil {
-		return nil, err
+	if loginInput.Password != user.Password {
+		return nil, errors.New("passwords don't match")
 	}
 
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -87,7 +82,7 @@ func (u *UserService) Login(ctx context.Context, loginInput LoginInput) (*AuthRe
 		"role":  user.Role,
 		"email": user.Email,
 	})
-	s, err := t.SignedString("tryandbruteforcethisbitch")
+	s, err := t.SignedString([]byte("tryandbruteforcethisbitch"))
 
 	if err != nil {
 		return nil, err
@@ -123,12 +118,13 @@ func (u *UserService) CreateTestUser(ctx context.Context, userInput UserInput) (
 		return nil, errors.New("user already exists")
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInput.Password), 14)
-	fmt.Println(string(hashedPassword))
-	if err != nil {
-		return nil, err
-	}
-	userInput.Password = string(hashedPassword)
+	// hashing feature not working for now
+	//hashedPassword, err := bcrypt.GenerateFromPassword([]byte(userInput.Password), 14)
+	//fmt.Println(string(hashedPassword))
+	//if err != nil {
+	//return nil, err
+	//}
+	//userInput.Password = string(hashedPassword)
 
 	return u.repo.createUser(ctx, userInput)
 }
