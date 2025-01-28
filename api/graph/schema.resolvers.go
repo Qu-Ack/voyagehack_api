@@ -14,6 +14,7 @@ import (
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/messaging"
 	"github.com/Qu-Ack/voyagehack_api/services/observers"
+	"github.com/Qu-Ack/voyagehack_api/services/payment"
 	"github.com/Qu-Ack/voyagehack_api/services/user"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -142,10 +143,34 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
 
+	err := r.PaymentService.ValidatePayment(&payment.ValidatePaymentRequest{
+		RazorpayPaymentId: input.RazorpayPaymentID,
+		RazorpayOrderId:   input.RazorpayOrderID,
+		RazorpaySignature: input.RazorpaySignature,
+	}, authedUser)
+
+	if err != nil {
+		return nil, err
+	}
+
+	hospital, err := r.HospitalService.GetHospital(ctx, input.HospitalID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	receiverUserId := selectRandomParticipant(hospital.Participants.Roots)
+
+	user, err := r.UserService.Me(ctx, receiverUserId.Hex())
+
+	if err != nil {
+		return nil, err
+	}
+
 	mail, err := r.MailService.SendApplication(ctx, &mail.Mail{
 		Content:   input.Content,
 		Sender:    authedUser.Email,
-		Receiver:  input.Receiver,
+		Receiver:  user.Email,
 		Documents: input.Documents,
 		Type:      mail.Application,
 		CreatedAt: primitive.NewDateTimeFromTime(time.Now()),
@@ -155,7 +180,7 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 		return nil, err
 	}
 
-	r.ObserverService.PublishMail(input.Receiver, &observers.MailBoxSubscriptionResopnse{
+	r.ObserverService.PublishMail(user.Email, &observers.MailBoxSubscriptionResopnse{
 		Received: observers.Mail{
 			ID:        mail.ID,
 			Sender:    mail.Sender,
@@ -187,7 +212,7 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 }
 
 // SendNormalMail is the resolver for the sendNormalMail field.
-func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendMailInput) (*model.Mail, error) {
+func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendNormalMailInput) (*model.Mail, error) {
 	authedUser, ok := ctx.Value("user").(user.PublicUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
@@ -421,7 +446,18 @@ func (r *queryResolver) GetS3Url(ctx context.Context) (string, error) {
 	}
 
 	return r.UploadService.GetPresignedURL()
+}
 
+// GetOrderID is the resolver for the getOrderId field.
+func (r *queryResolver) GetOrderID(ctx context.Context) (string, error) {
+	authedUser, ok := ctx.Value("user").(user.PublicUser)
+	if !ok {
+		return "", fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	return r.PaymentService.NewOrder(&payment.OrderRequest{
+		Amount: 100,
+	}, authedUser)
 }
 
 // MailBoxSubscription is the resolver for the MailBoxSubscription field.

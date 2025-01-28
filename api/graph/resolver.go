@@ -1,9 +1,11 @@
 package graph
 
 import (
+	"github.com/Qu-Ack/voyagehack_api/services/hospital"
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/messaging"
 	"github.com/Qu-Ack/voyagehack_api/services/observers"
+	"github.com/Qu-Ack/voyagehack_api/services/payment"
 	"github.com/Qu-Ack/voyagehack_api/services/upload"
 	"github.com/Qu-Ack/voyagehack_api/services/user"
 )
@@ -17,4 +19,6 @@ type Resolver struct {
 	MailService      *mail.MailService
 	MessagingService *messaging.MessagingService
 	UploadService    *upload.UploadService
+	HospitalService  *hospital.HospitalService
+	PaymentService   *payment.PaymentService
 }

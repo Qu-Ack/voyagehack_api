@@ -104,13 +104,14 @@ type ComplexityRoot struct {
 		OpenRoom        func(childComplexity int, roomid string) int
 		SendApplication func(childComplexity int, input model.SendMailInput) int
 		SendMessage     func(childComplexity int, input model.SendMessageInput) int
-		SendNormalMail  func(childComplexity int, input model.SendMailInput) int
+		SendNormalMail  func(childComplexity int, input model.SendNormalMailInput) int
 		StartChat       func(childComplexity int, participantID string) int
 	}
 
 	Query struct {
 		GetEmailByID    func(childComplexity int, id string) int
 		GetMailBox      func(childComplexity int) int
+		GetOrderID      func(childComplexity int) int
 		GetRoom         func(childComplexity int, roomID string) int
 		GetS3Url        func(childComplexity int) int
 		Me              func(childComplexity int) int
@@ -144,7 +145,7 @@ type MutationResolver interface {
 	CreateStaff(ctx context.Context, input model.UserInput) (*model.User, error)
 	CreateTestUser(ctx context.Context, input model.UserInput) (*model.User, error)
 	SendApplication(ctx context.Context, input model.SendMailInput) (*model.Mail, error)
-	SendNormalMail(ctx context.Context, input model.SendMailInput) (*model.Mail, error)
+	SendNormalMail(ctx context.Context, input model.SendNormalMailInput) (*model.Mail, error)
 	StartChat(ctx context.Context, participantID string) (*model.Room, error)
 	SendMessage(ctx context.Context, input model.SendMessageInput) (*model.Room, error)
 	CloseRoom(ctx context.Context, roomid string) (*model.Room, error)
@@ -157,6 +158,7 @@ type QueryResolver interface {
 	GetMailBox(ctx context.Context) (*model.MailBox, error)
 	GetRoom(ctx context.Context, roomID string) (*model.Room, error)
 	GetS3Url(ctx context.Context) (string, error)
+	GetOrderID(ctx context.Context) (string, error)
 }
 type SubscriptionResolver interface {
 	MailBoxSubscription(ctx context.Context) (<-chan *model.MailBoxSubscriptionResponse, error)
@@ -468,7 +470,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.SendNormalMail(childComplexity, args["input"].(model.SendMailInput)), true
+		return e.complexity.Mutation.SendNormalMail(childComplexity, args["input"].(model.SendNormalMailInput)), true
 
 	case "Mutation.startChat":
 		if e.complexity.Mutation.StartChat == nil {
@@ -500,6 +502,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.GetMailBox(childComplexity), true
+
+	case "Query.getOrderId":
+		if e.complexity.Query.GetOrderID == nil {
+			break
+		}
+
+		return e.complexity.Query.GetOrderID(childComplexity), true
 
 	case "Query.getRoom":
 		if e.complexity.Query.GetRoom == nil {
@@ -617,6 +626,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputUserInput,
 		ec.unmarshalInputsendMailInput,
 		ec.unmarshalInputsendMessageInput,
+		ec.unmarshalInputsendNormalMailInput,
 	)
 	first := true
 
@@ -970,13 +980,13 @@ func (ec *executionContext) field_Mutation_sendNormalMail_args(ctx context.Conte
 func (ec *executionContext) field_Mutation_sendNormalMail_argsInput(
 	ctx context.Context,
 	rawArgs map[string]any,
-) (model.SendMailInput, error) {
+) (model.SendNormalMailInput, error) {
 	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
 	if tmp, ok := rawArgs["input"]; ok {
-		return ec.unmarshalNsendMailInput2githubᚗcomᚋQuᚑAckᚋvoyagehack_apiᚋapiᚋgraphᚋmodelᚐSendMailInput(ctx, tmp)
+		return ec.unmarshalNsendNormalMailInput2githubᚗcomᚋQuᚑAckᚋvoyagehack_apiᚋapiᚋgraphᚋmodelᚐSendNormalMailInput(ctx, tmp)
 	}
 
-	var zeroVal model.SendMailInput
+	var zeroVal model.SendNormalMailInput
 	return zeroVal, nil
 }
 
@@ -2680,7 +2690,7 @@ func (ec *executionContext) _Mutation_sendNormalMail(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().SendNormalMail(rctx, fc.Args["input"].(model.SendMailInput))
+		return ec.resolvers.Mutation().SendNormalMail(rctx, fc.Args["input"].(model.SendNormalMailInput))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -3318,6 +3328,50 @@ func (ec *executionContext) _Query_getS3Url(ctx context.Context, field graphql.C
 }
 
 func (ec *executionContext) fieldContext_Query_getS3Url(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Query_getOrderId(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_getOrderId(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().GetOrderID(rctx)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_getOrderId(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "Query",
 		Field:      field,
@@ -5848,20 +5902,20 @@ func (ec *executionContext) unmarshalInputsendMailInput(ctx context.Context, obj
 		asMap[k] = v
 	}
 
-	fieldsInOrder := [...]string{"receiver", "content", "documents"}
+	fieldsInOrder := [...]string{"hospitalId", "content", "documents", "razorpay_payment_id", "razorpay_order_id", "razorpay_signature"}
 	for _, k := range fieldsInOrder {
 		v, ok := asMap[k]
 		if !ok {
 			continue
 		}
 		switch k {
-		case "receiver":
-			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("receiver"))
+		case "hospitalId":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("hospitalId"))
 			data, err := ec.unmarshalNString2string(ctx, v)
 			if err != nil {
 				return it, err
 			}
-			it.Receiver = data
+			it.HospitalID = data
 		case "content":
 			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("content"))
 			data, err := ec.unmarshalNString2string(ctx, v)
@@ -5876,6 +5930,27 @@ func (ec *executionContext) unmarshalInputsendMailInput(ctx context.Context, obj
 				return it, err
 			}
 			it.Documents = data
+		case "razorpay_payment_id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("razorpay_payment_id"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RazorpayPaymentID = data
+		case "razorpay_order_id":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("razorpay_order_id"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RazorpayOrderID = data
+		case "razorpay_signature":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("razorpay_signature"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.RazorpaySignature = data
 		}
 	}
 
@@ -5910,6 +5985,47 @@ func (ec *executionContext) unmarshalInputsendMessageInput(ctx context.Context, 
 				return it, err
 			}
 			it.RoomID = data
+		}
+	}
+
+	return it, nil
+}
+
+func (ec *executionContext) unmarshalInputsendNormalMailInput(ctx context.Context, obj any) (model.SendNormalMailInput, error) {
+	var it model.SendNormalMailInput
+	asMap := map[string]any{}
+	for k, v := range obj.(map[string]any) {
+		asMap[k] = v
+	}
+
+	fieldsInOrder := [...]string{"receiver", "content", "documents"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "receiver":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("receiver"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Receiver = data
+		case "content":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("content"))
+			data, err := ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Content = data
+		case "documents":
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("documents"))
+			data, err := ec.unmarshalOString2ᚕᚖstring(ctx, v)
+			if err != nil {
+				return it, err
+			}
+			it.Documents = data
 		}
 	}
 
@@ -6531,6 +6647,28 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_getS3Url(ctx, field)
+				if res == graphql.Null {
+					atomic.AddUint32(&fs.Invalids, 1)
+				}
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx,
+					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
+			}
+
+			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
+		case "getOrderId":
+			field := field
+
+			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_getOrderId(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -7684,6 +7822,11 @@ func (ec *executionContext) unmarshalNsendMailInput2githubᚗcomᚋQuᚑAckᚋvo
 
 func (ec *executionContext) unmarshalNsendMessageInput2githubᚗcomᚋQuᚑAckᚋvoyagehack_apiᚋapiᚋgraphᚋmodelᚐSendMessageInput(ctx context.Context, v any) (model.SendMessageInput, error) {
 	res, err := ec.unmarshalInputsendMessageInput(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) unmarshalNsendNormalMailInput2githubᚗcomᚋQuᚑAckᚋvoyagehack_apiᚋapiᚋgraphᚋmodelᚐSendNormalMailInput(ctx context.Context, v any) (model.SendNormalMailInput, error) {
+	res, err := ec.unmarshalInputsendNormalMailInput(ctx, v)
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 

@@ -1,10 +1,13 @@
 package graph
 
 import (
+	"time"
+
 	"github.com/Qu-Ack/voyagehack_api/api/graph/model"
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/messaging"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"golang.org/x/exp/rand"
 )
 
 func convertObjectIDToStringSlice(ids []primitive.ObjectID) []*string {
@@ -50,4 +53,12 @@ func convertParticipants(participants []primitive.ObjectID) []string {
 		result[i] = participant.Hex() // Convert ObjectID to string
 	}
 	return result
+}
+
+func selectRandomParticipant(participants []primitive.ObjectID) primitive.ObjectID {
+	rand.Seed(uint64(time.Now().UnixNano()))
+
+	randomIndex := rand.Intn(len(participants))
+
+	return participants[randomIndex]
 }

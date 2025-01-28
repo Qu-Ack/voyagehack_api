@@ -8,6 +8,7 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/gorilla/websocket v1.5.0
+	github.com/razorpay/razorpay-go v1.3.2
 	github.com/vektah/gqlparser/v2 v2.5.21
 	go.mongodb.org/mongo-driver v1.17.2
 	golang.org/x/crypto v0.31.0

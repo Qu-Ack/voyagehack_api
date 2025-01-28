@@ -95,14 +95,23 @@ type UserInput struct {
 }
 
 type SendMailInput struct {
-	Receiver  string    `json:"receiver"`
-	Content   string    `json:"content"`
-	Documents []*string `json:"documents,omitempty"`
+	HospitalID        string    `json:"hospitalId"`
+	Content           string    `json:"content"`
+	Documents         []*string `json:"documents,omitempty"`
+	RazorpayPaymentID string    `json:"razorpay_payment_id"`
+	RazorpayOrderID   string    `json:"razorpay_order_id"`
+	RazorpaySignature string    `json:"razorpay_signature"`
 }
 
 type SendMessageInput struct {
 	Content string `json:"content"`
 	RoomID  string `json:"roomId"`
+}
+
+type SendNormalMailInput struct {
+	Receiver  string    `json:"receiver"`
+	Content   string    `json:"content"`
+	Documents []*string `json:"documents,omitempty"`
 }
 
 type EmailType string

@@ -69,8 +69,17 @@ type Mail {
 }
 
 input sendMailInput {
-  receiver: String!  
+  hospitalId: String!  
   content: String! 
+  documents: [String]
+  razorpay_payment_id: String!
+  razorpay_order_id: String!
+  razorpay_signature: String!
+}
+
+input sendNormalMailInput {
+  receiver: String! 
+  content: String!
   documents: [String]
 }
 
@@ -97,6 +106,7 @@ type Query {
   getMailBox: MailBox!
   getRoom(roomId: String!): Room!
   getS3Url: String!
+  getOrderId: String!
 }
 
 type Mutation {
@@ -106,7 +116,7 @@ type Mutation {
   createStaff(input: UserInput!): User!
   createTestUser(input:UserInput!): User!
   sendApplication(input:sendMailInput!): Mail!
-  sendNormalMail(input:sendMailInput!): Mail!
+  sendNormalMail(input:sendNormalMailInput!): Mail!
   startChat(participantId: String!): Room!
   sendMessage(input:sendMessageInput!): Room!
   closeRoom(roomid: String!): Room!
