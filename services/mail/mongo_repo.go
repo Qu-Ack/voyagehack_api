@@ -62,7 +62,7 @@ func (m *MailRepo) findMailBox(ctx context.Context, emailId string) (*MailBox, e
 func (m *MailRepo) AddMailToSent(ctx context.Context, mailId string, mail primitive.ObjectID) error {
 	mailBoxCollection := m.db.Collection("mailbox")
 
-	result := mailBoxCollection.FindOneAndUpdate(ctx, bson.M{"Email": mailId}, bson.D{{"$push", bson.D{{"sent", mail}}}})
+	result := mailBoxCollection.FindOneAndUpdate(ctx, bson.M{"email": mailId}, bson.D{{"$push", bson.D{{"sent", mail}}}})
 
 	if result.Err() != nil {
 		return result.Err()
@@ -74,7 +74,7 @@ func (m *MailRepo) AddMailToSent(ctx context.Context, mailId string, mail primit
 func (m *MailRepo) AddMailToReceived(ctx context.Context, mailId string, mail primitive.ObjectID) error {
 	mailBoxCollection := m.db.Collection("mailbox")
 
-	result := mailBoxCollection.FindOneAndUpdate(ctx, bson.M{"Email": mailId}, bson.D{{"$push", bson.D{{"received", mail}}}})
+	result := mailBoxCollection.FindOneAndUpdate(ctx, bson.M{"email": mailId}, bson.D{{"$push", bson.D{{"received", mail}}}})
 
 	if result.Err() != nil {
 		return result.Err()

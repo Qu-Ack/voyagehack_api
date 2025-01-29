@@ -47,6 +47,9 @@ func convertMailSlice(mails []mail.Mail) []*model.Mail {
 }
 
 func convertMessages(messages []messaging.Message) []*model.Message {
+	if messages == nil {
+		return nil
+	}
 	result := make([]*model.Message, len(messages))
 	for i, msg := range messages {
 		result[i] = &model.Message{
@@ -58,6 +61,9 @@ func convertMessages(messages []messaging.Message) []*model.Message {
 }
 
 func convertParticipants(participants []primitive.ObjectID) []string {
+	if participants == nil {
+		return nil
+	}
 	result := make([]string, len(participants))
 	for i, participant := range participants {
 		result[i] = participant.Hex() // Convert ObjectID to string

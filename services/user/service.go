@@ -110,6 +110,22 @@ func (u *UserService) Me(ctx context.Context, userId string) (*PublicUser, error
 	return user, nil
 }
 
+func (u *UserService) MeByEmail(ctx context.Context, userEmail string) (*PublicUser, error) {
+	user, err := u.repo.getUserByEmail(ctx, userEmail)
+	if err != nil {
+		return nil, err
+	}
+
+	return &PublicUser{
+		ID:         user.ID.Hex(),
+		Name:       user.Name,
+		Email:      user.Email,
+		Role:       user.Role,
+		ProfilePic: user.ProfilePic,
+	}, nil
+
+}
+
 func (u *UserService) CreateTestUser(ctx context.Context, userInput UserInput) (*PublicUser, error) {
 
 	_, err := u.repo.getUserByEmail(ctx, userInput.Email)

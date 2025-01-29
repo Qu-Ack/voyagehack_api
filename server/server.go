@@ -14,6 +14,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/Qu-Ack/voyagehack_api/api/graph"
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
+	"github.com/Qu-Ack/voyagehack_api/services/messaging"
 	"github.com/Qu-Ack/voyagehack_api/services/observers"
 	"github.com/Qu-Ack/voyagehack_api/services/upload"
 	"github.com/Qu-Ack/voyagehack_api/services/user"
@@ -54,6 +55,8 @@ func New() (*http.Server, error) {
 	observerService := observers.NewObserversService()
 	mailRepo := mail.NewMailRepo(db)
 	mailService := mail.NewMailService(mailRepo)
+	messageRepo := messaging.NewMessageRepo(db)
+	messageService := messaging.NewMessageService(messageRepo)
 
 	uploadService, err := upload.NewUploadService()
 
@@ -65,10 +68,11 @@ func New() (*http.Server, error) {
 	// GraphQL handler
 	srv := handler.New(graph.NewExecutableSchema(graph.Config{
 		Resolvers: &graph.Resolver{
-			UserService:     userService,
-			ObserverService: observerService,
-			MailService:     mailService,
-			UploadService:   uploadService,
+			UserService:      userService,
+			ObserverService:  observerService,
+			MailService:      mailService,
+			MessagingService: messageService,
+			UploadService:    uploadService,
 		},
 	}))
 

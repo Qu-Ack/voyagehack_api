@@ -13,7 +13,6 @@ import (
 	"github.com/Qu-Ack/voyagehack_api/api/graph/model"
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/messaging"
-	"github.com/Qu-Ack/voyagehack_api/services/observers"
 	"github.com/Qu-Ack/voyagehack_api/services/payment"
 	"github.com/Qu-Ack/voyagehack_api/services/user"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -214,24 +213,24 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 		return nil, err
 	}
 
-	r.ObserverService.PublishMail(user.Email, &observers.MailBoxSubscriptionResponse{
-		Received: observers.Mail{
-			ID:        mail.ID,
+	r.ObserverService.PublishMail(user.Email, &model.MailBoxSubscriptionResponse{
+		Received: &model.Mail{
+			ID:        mail.ID.Hex(),
 			Sender:    mail.Sender,
 			Receiver:  mail.Receiver,
 			Content:   mail.Content,
 			Documents: mail.Documents,
-			CreatedAt: mail.CreatedAt,
+			CreatedAt: mail.CreatedAt.Time().String(),
 		},
 	})
-	r.ObserverService.PublishMail(authedUser.Email, &observers.MailBoxSubscriptionResponse{
-		Sent: observers.Mail{
-			ID:        mail.ID,
+	r.ObserverService.PublishMail(authedUser.Email, &model.MailBoxSubscriptionResponse{
+		Sent: &model.Mail{
+			ID:        mail.ID.Hex(),
 			Sender:    mail.Sender,
 			Receiver:  mail.Receiver,
 			Content:   mail.Content,
 			Documents: mail.Documents,
-			CreatedAt: mail.CreatedAt,
+			CreatedAt: mail.CreatedAt.Time().String(),
 		},
 	})
 
@@ -269,24 +268,24 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 		return nil, err
 	}
 
-	r.ObserverService.PublishMail(input.Receiver, &observers.MailBoxSubscriptionResponse{
-		Received: observers.Mail{
-			ID:        mail.ID,
+	r.ObserverService.PublishMail(input.Receiver, &model.MailBoxSubscriptionResponse{
+		Received: &model.Mail{
+			ID:        mail.ID.Hex(),
 			Sender:    mail.Sender,
 			Receiver:  mail.Receiver,
 			Content:   mail.Content,
 			Documents: mail.Documents,
-			CreatedAt: mail.CreatedAt,
+			CreatedAt: mail.CreatedAt.Time().String(),
 		},
 	})
-	r.ObserverService.PublishMail(authedUser.Email, &observers.MailBoxSubscriptionResponse{
-		Sent: observers.Mail{
-			ID:        mail.ID,
+	r.ObserverService.PublishMail(authedUser.Email, &model.MailBoxSubscriptionResponse{
+		Sent: &model.Mail{
+			ID:        mail.ID.Hex(),
 			Sender:    mail.Sender,
 			Receiver:  mail.Receiver,
 			Content:   mail.Content,
 			Documents: mail.Documents,
-			CreatedAt: mail.CreatedAt,
+			CreatedAt: mail.CreatedAt.Time().String(),
 		},
 	})
 
@@ -302,20 +301,43 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 }
 
 // StartChat is the resolver for the startChat field.
-func (r *mutationResolver) StartChat(ctx context.Context, participantID string) (*model.Room, error) {
+func (r *mutationResolver) StartChat(ctx context.Context, particpantMail string) (*model.Room, error) {
+	fmt.Println("resolver called")
 	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
 
-	room, err := r.MessagingService.CreateRoom(ctx, participantID, user.PublicUser{
+	// Fetch participant
+	participant, err := r.UserService.MeByEmail(ctx, particpantMail)
+	if err != nil {
+		fmt.Println("user service error:", err)
+		return nil, err
+	}
+	if participant == nil {
+		fmt.Println("participant is nil")
+		return nil, fmt.Errorf("participant not found")
+	}
+
+	// Ensure participant.ID is valid
+	if participant.ID == "" {
+		return nil, fmt.Errorf("participant has no ID")
+	}
+
+	// Create room
+	room, err := r.MessagingService.CreateRoom(ctx, participant.ID, user.PublicUser{
 		ID:    authedUser.ID,
 		Role:  user.Role(authedUser.Role),
 		Email: authedUser.Email,
 	})
-
 	if err != nil {
+		fmt.Println("messaging service error:", err)
 		return nil, err
+	}
+
+	// Ensure room is not nil (defensive check)
+	if room == nil {
+		return nil, fmt.Errorf("failed to create room")
 	}
 
 	return &model.Room{
@@ -343,6 +365,24 @@ func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMess
 
 	if err != nil {
 		return nil, err
+	}
+
+	// publish the message to all the subscribed entities
+
+	for _, singleRoom := range room.Participants {
+		user, err := r.UserService.Me(ctx, singleRoom.Hex())
+
+		if err != nil {
+			return nil, err
+		}
+
+		r.ObserverService.PublishMessage(user.Email, &model.MessageSubscriptionResponse{
+			RoomID: room.ID.Hex(),
+			Message: &model.Message{
+				Content: input.Content,
+				Author:  authedUser.Email,
+			},
+		})
 	}
 
 	return &model.Room{
@@ -589,7 +629,7 @@ func (r *subscriptionResolver) MailBoxSubscription(ctx context.Context) (<-chan 
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
 
-	return r.ObserverService.SubscribeToMail(ctx, authedUser.Email).(<-chan *model.MailBoxSubscriptionResponse), nil
+	return r.ObserverService.SubscribeToMail(ctx, authedUser.Email), nil
 }
 
 // MessageBoxSubscription is the resolver for the MessageBoxSubscription field.
@@ -599,7 +639,7 @@ func (r *subscriptionResolver) MessageBoxSubscription(ctx context.Context) (<-ch
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
-	return r.ObserverService.SubscribeToMessage(ctx, authedUser.Email).(<-chan *model.MessageSubscriptionResponse), nil
+	return r.ObserverService.SubscribeToMessage(ctx, authedUser.Email), nil
 }
 
 // Mutation returns MutationResolver implementation.

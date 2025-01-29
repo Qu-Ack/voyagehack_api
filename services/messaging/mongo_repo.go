@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"context"
+	"fmt"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -19,13 +20,17 @@ func NewMessageRepo(db *mongo.Database) *MessageRepo {
 }
 
 func (m *MessageRepo) createRoom(ctx context.Context, room *Room) (*Room, error) {
+	fmt.Println("in create room")
 	chatCollection := m.db.Collection("chat")
 
+	fmt.Println("before insertion")
 	insertResult, err := chatCollection.InsertOne(ctx, room)
 
 	if err != nil {
 		return nil, err
 	}
+
+	fmt.Println("after insertion")
 
 	room.ID = insertResult.InsertedID.(primitive.ObjectID)
 

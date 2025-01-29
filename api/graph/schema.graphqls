@@ -135,7 +135,7 @@ type Mutation {
   createTestUser(input:TestUserInput!): User!
   sendApplication(input:sendMailInput!): Mail!
   sendNormalMail(input:sendNormalMailInput!): Mail!
-  startChat(participantId: String!): Room!
+  startChat(particpantMail: String!): Room!
   sendMessage(input:sendMessageInput!): Room!
   closeRoom(roomid: String!): Room!
   openRoom(roomid: String!): Room!

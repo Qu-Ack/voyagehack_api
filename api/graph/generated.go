@@ -110,7 +110,7 @@ type ComplexityRoot struct {
 		SendApplication func(childComplexity int, input model.SendMailInput) int
 		SendMessage     func(childComplexity int, input model.SendMessageInput) int
 		SendNormalMail  func(childComplexity int, input model.SendNormalMailInput) int
-		StartChat       func(childComplexity int, participantID string) int
+		StartChat       func(childComplexity int, particpantMail string) int
 	}
 
 	Participants struct {
@@ -158,7 +158,7 @@ type MutationResolver interface {
 	CreateTestUser(ctx context.Context, input model.TestUserInput) (*model.User, error)
 	SendApplication(ctx context.Context, input model.SendMailInput) (*model.Mail, error)
 	SendNormalMail(ctx context.Context, input model.SendNormalMailInput) (*model.Mail, error)
-	StartChat(ctx context.Context, participantID string) (*model.Room, error)
+	StartChat(ctx context.Context, particpantMail string) (*model.Room, error)
 	SendMessage(ctx context.Context, input model.SendMessageInput) (*model.Room, error)
 	CloseRoom(ctx context.Context, roomid string) (*model.Room, error)
 	OpenRoom(ctx context.Context, roomid string) (*model.Room, error)
@@ -515,7 +515,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.StartChat(childComplexity, args["participantId"].(string)), true
+		return e.complexity.Mutation.StartChat(childComplexity, args["particpantMail"].(string)), true
 
 	case "Participants.doctors":
 		if e.complexity.Participants.Doctors == nil {
@@ -1096,19 +1096,19 @@ func (ec *executionContext) field_Mutation_sendNormalMail_argsInput(
 func (ec *executionContext) field_Mutation_startChat_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
 	args := map[string]any{}
-	arg0, err := ec.field_Mutation_startChat_argsParticipantID(ctx, rawArgs)
+	arg0, err := ec.field_Mutation_startChat_argsParticpantMail(ctx, rawArgs)
 	if err != nil {
 		return nil, err
 	}
-	args["participantId"] = arg0
+	args["particpantMail"] = arg0
 	return args, nil
 }
-func (ec *executionContext) field_Mutation_startChat_argsParticipantID(
+func (ec *executionContext) field_Mutation_startChat_argsParticpantMail(
 	ctx context.Context,
 	rawArgs map[string]any,
 ) (string, error) {
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("participantId"))
-	if tmp, ok := rawArgs["participantId"]; ok {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("particpantMail"))
+	if tmp, ok := rawArgs["particpantMail"]; ok {
 		return ec.unmarshalNString2string(ctx, tmp)
 	}
 
@@ -2913,7 +2913,7 @@ func (ec *executionContext) _Mutation_startChat(ctx context.Context, field graph
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().StartChat(rctx, fc.Args["participantId"].(string))
+		return ec.resolvers.Mutation().StartChat(rctx, fc.Args["particpantMail"].(string))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

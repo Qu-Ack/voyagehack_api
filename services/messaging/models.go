@@ -6,7 +6,7 @@ type Room struct {
 	ID           primitive.ObjectID   `bson:"_id,omitempty"`
 	Messages     []Message            `bson:"messages,omitempty"`
 	Participants []primitive.ObjectID `bson:"participants,omitempty"`
-	State        string               `bson:"state"`
+	State        string               `bson:"state,omitempty"`
 }
 
 type Message struct {

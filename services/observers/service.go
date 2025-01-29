@@ -3,6 +3,8 @@ package observers
 import (
 	"context"
 	"sync"
+
+	"github.com/Qu-Ack/voyagehack_api/api/graph/model"
 )
 
 // chan *MailBoxSubscriptionResponse
@@ -22,7 +24,7 @@ func NewObserversService() *ObserverService {
 	}
 }
 
-func (o *ObserverService) Subscribe(ctx context.Context, resourceId string, subscriptionType string) interface{} {
+func (o *ObserverService) subscribetomail(ctx context.Context, resourceId string) <-chan *model.MailBoxSubscriptionResponse {
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
@@ -32,23 +34,42 @@ func (o *ObserverService) Subscribe(ctx context.Context, resourceId string, subs
 		}
 	}
 
-	var ch interface{}
-	switch subscriptionType {
-	case "MAIL":
-		ch = make(chan *MailBoxSubscriptionResponse, 10)
-		break
-	case "MESSAGE":
-		ch = make(chan *MessageSubscriptionResponse, 10)
-
-	}
+	var ch chan *model.MailBoxSubscriptionResponse
+	ch = make(chan *model.MailBoxSubscriptionResponse, 10)
 
 	o.observers[resourceId].mu.Lock()
-	o.observers[resourceId].Channels[subscriptionType] = ch
+	o.observers[resourceId].Channels["MAIL"] = ch
 	o.observers[resourceId].mu.Unlock()
 
 	go func() {
 		<-ctx.Done()
-		o.UnSubscribe(resourceId, subscriptionType)
+		o.UnSubscribe(resourceId, "MAIL")
+	}()
+
+	return ch
+
+}
+
+func (o *ObserverService) subscribetomessage(ctx context.Context, resourceId string) <-chan *model.MessageSubscriptionResponse {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+
+	if _, exists := o.observers[resourceId]; !exists {
+		o.observers[resourceId] = &Subscriptions{
+			Channels: make(map[string]interface{}),
+		}
+	}
+
+	var ch chan *model.MessageSubscriptionResponse
+	ch = make(chan *model.MessageSubscriptionResponse, 10)
+
+	o.observers[resourceId].mu.Lock()
+	o.observers[resourceId].Channels["MESSAGE"] = ch
+	o.observers[resourceId].mu.Unlock()
+
+	go func() {
+		<-ctx.Done()
+		o.UnSubscribe(resourceId, "MESSAGE")
 	}()
 
 	return ch
@@ -68,10 +89,10 @@ func (o *ObserverService) UnSubscribe(resourceId string, subscriptionType string
 
 	switch subscriptionType {
 	case "MAIL":
-		close(observer.Channels[subscriptionType].(chan *MailBoxSubscriptionResponse))
+		close(observer.Channels[subscriptionType].(chan *model.MailBoxSubscriptionResponse))
 		delete(observer.Channels, subscriptionType)
 	case "MESSAGE":
-		close(observer.Channels[subscriptionType].(chan *MessageSubscriptionResponse))
+		close(observer.Channels[subscriptionType].(chan *model.MessageSubscriptionResponse))
 		delete(observer.Channels, subscriptionType)
 	}
 
@@ -82,7 +103,7 @@ func (o *ObserverService) UnSubscribe(resourceId string, subscriptionType string
 	}
 }
 
-func (o *ObserverService) Publish(message interface{}, resourceId string, subscriptionType string) {
+func (o *ObserverService) PublishToMail(message *model.MailBoxSubscriptionResponse, resourceId string) {
 	o.mu.RLock()
 	observer, ok := o.observers[resourceId]
 	o.mu.RUnlock()
@@ -94,27 +115,38 @@ func (o *ObserverService) Publish(message interface{}, resourceId string, subscr
 	observer.mu.Lock()
 	defer observer.mu.Unlock()
 
-	switch subscriptionType {
-	case "MAIL":
-		observer.Channels[subscriptionType].(chan *MailBoxSubscriptionResponse) <- message.(*MailBoxSubscriptionResponse)
-	case "MESSAGE":
-		observer.Channels[subscriptionType].(chan *MessageSubscriptionResponse) <- message.(*MessageSubscriptionResponse)
+	observer.Channels["MAIL"].(chan *model.MailBoxSubscriptionResponse) <- message
+
+}
+
+func (o *ObserverService) PublishToMessage(message *model.MessageSubscriptionResponse, resourceId string) {
+	o.mu.RLock()
+	observer, ok := o.observers[resourceId]
+	o.mu.RUnlock()
+
+	if !ok {
+		return
 	}
 
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+
+	observer.Channels["MESSAGE"].(chan *model.MessageSubscriptionResponse) <- message
+
 }
 
-func (o *ObserverService) SubscribeToMail(ctx context.Context, mailId string) interface{} {
-	return o.Subscribe(ctx, mailId, "MAIL")
+func (o *ObserverService) SubscribeToMail(ctx context.Context, mailId string) <-chan *model.MailBoxSubscriptionResponse {
+	return o.subscribetomail(ctx, mailId)
 }
 
-func (o *ObserverService) PublishMail(receiver string, message *MailBoxSubscriptionResponse) {
-	o.Publish(message, receiver, "MAIL")
+func (o *ObserverService) PublishMail(receiver string, message *model.MailBoxSubscriptionResponse) {
+	o.PublishToMail(message, receiver)
 }
 
-func (o *ObserverService) SubscribeToMessage(ctx context.Context, mailId string) interface{} {
-	return o.Subscribe(ctx, mailId, "MESSAGE")
+func (o *ObserverService) SubscribeToMessage(ctx context.Context, mailId string) <-chan *model.MessageSubscriptionResponse {
+	return o.subscribetomessage(ctx, mailId)
 }
 
-func (o *ObserverService) PublishMessage(receiver string, message *MessageSubscriptionResponse) {
-	o.Publish(message, receiver, "MESSAGE")
+func (o *ObserverService) PublishMessage(receiver string, message *model.MessageSubscriptionResponse) {
+	o.PublishToMessage(message, receiver)
 }

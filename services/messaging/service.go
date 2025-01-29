@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 
 	"github.com/Qu-Ack/voyagehack_api/services/user"
@@ -23,26 +24,41 @@ func (m *MessagingService) CreateRoom(ctx context.Context, participantId string,
 	if requester.Role != user.RoleDoctor {
 		return nil, errors.New("Only Doctors Can Create A chat room")
 	}
+	fmt.Println("role check")
 
 	participantObjectId, err := primitive.ObjectIDFromHex(participantId)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(participantObjectId)
 
 	requestUserObjectId, err := primitive.ObjectIDFromHex(requester.ID)
 
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(requestUserObjectId)
 
-	var particpants []primitive.ObjectID
+	participants := make([]primitive.ObjectID, 0)
 
-	particpants = append(particpants, participantObjectId, requestUserObjectId)
+	participants = append(participants, participantObjectId, requestUserObjectId)
+	fmt.Println(participants)
+	messages := make([]Message, 0)
+	room := Room{
+		Participants: participants,
+		Messages:     messages,
+		State:        "OPEN",
+	}
 
-	return m.repo.createRoom(ctx, &Room{
-		Participants: particpants,
-		Messages:     make([]Message, 0),
-	})
+	returnedRoom, err := m.repo.createRoom(ctx, &room)
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	fmt.Println("room created success")
+
+	return returnedRoom, nil
 
 }
 
