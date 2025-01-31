@@ -16,10 +16,12 @@ import (
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/messaging"
 	"github.com/Qu-Ack/voyagehack_api/services/observers"
+	"github.com/Qu-Ack/voyagehack_api/services/payment"
 	"github.com/Qu-Ack/voyagehack_api/services/upload"
 	"github.com/Qu-Ack/voyagehack_api/services/user"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	"github.com/golang-jwt/jwt"
 	"github.com/gorilla/websocket"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -46,6 +48,16 @@ func New() (*http.Server, error) {
 
 	// Gin router setup
 	router := gin.Default()
+
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:3000", "https://yourfrontend.com"}, // Adjust as needed
+		AllowMethods:     []string{"GET", "POST", "OPTIONS", "PUT", "DELETE"},
+		AllowHeaders:     []string{"Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	router.Use(GinContextToContextMiddleware())
 	router.Use(AuthTokenMiddleware())
 
@@ -57,6 +69,7 @@ func New() (*http.Server, error) {
 	mailService := mail.NewMailService(mailRepo)
 	messageRepo := messaging.NewMessageRepo(db)
 	messageService := messaging.NewMessageService(messageRepo)
+	paymentService := payment.NewPaymentService()
 
 	uploadService, err := upload.NewUploadService()
 
@@ -70,6 +83,7 @@ func New() (*http.Server, error) {
 		Resolvers: &graph.Resolver{
 			UserService:      userService,
 			ObserverService:  observerService,
+			PaymentService:   paymentService,
 			MailService:      mailService,
 			MessagingService: messageService,
 			UploadService:    uploadService,
@@ -86,6 +100,7 @@ func New() (*http.Server, error) {
 		},
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
 			// Try to get token from payload
+			fmt.Println("web socket middleware called")
 			if auth, ok := initPayload["Authorization"].(string); ok {
 				token := strings.TrimPrefix(auth, "Bearer ")
 				fmt.Println(token)
@@ -189,6 +204,7 @@ func AuthTokenMiddleware() gin.HandlerFunc {
 		authToken := c.Request.Header.Get("Authorization")
 		if authToken == "" {
 			// Handle test token
+			fmt.Println("auth token null")
 			testToken := c.Request.Header.Get("TestToken")
 			if testToken == "tryandbruteforcethisbitch" {
 				user := "yes"
@@ -208,6 +224,8 @@ func AuthTokenMiddleware() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token format"})
 			return
 		}
+		fmt.Println("token is")
+		fmt.Println(tokenString)
 
 		// Validate token
 		token, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {

@@ -35,6 +35,7 @@ func convertToModelMail(m mail.Mail) *model.Mail {
 		Receiver:  m.Receiver,
 		Documents: m.Documents,
 		Content:   m.Content,
+		Type:      model.EmailType(m.Type),
 		CreatedAt: m.CreatedAt.Time().String(),
 	}
 }

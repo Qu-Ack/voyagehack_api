@@ -41,6 +41,12 @@ input UserInput {
   password: String!
   hospitalId: String!
 }
+input PatientInput {
+  name: String!
+  email: String!
+  profilePic: String!
+  password: String!
+}
 
 input TestUserInput {
   name: String!
@@ -78,10 +84,32 @@ type Mail {
 input sendMailInput {
   hospitalId: String!  
   content: String! 
+  patientName: String!
+  patientAge: String!
+  patientGender: String!
+  phoneNumber: String!
+  passport: String!
+  allergies: String!
   documents: [String]
   razorpay_payment_id: String!
   razorpay_order_id: String!
   razorpay_signature: String!
+}
+
+type Application {
+  id: ID!
+  content: String! 
+  patientName: String!
+  sender: String!
+  receiver: String!
+  patientAge: String!
+  documents: [String]
+  patientGender: String!
+  passport: String!
+  phoneNumber: String!
+  allergies: String!
+  type: EmailType!
+  createdAt: String!
 }
 
 input sendNormalMailInput {
@@ -119,10 +147,10 @@ type Participants {
 type Query {
   me: User!
   myDoctorProfile: Doctor
-  getEmailByID(id: ID!): Mail!
   getMailBox: MailBox!
   getRoom(roomId: String!): Room!
   getS3Url: String!
+  getMailById(id: String!): Application!
   getOrderId: String!
   getHospital: Hospital!
 }
@@ -133,10 +161,11 @@ type Mutation {
   createRoot(input: UserInput!): User!
   createStaff(input: UserInput!): User!
   createTestUser(input:TestUserInput!): User!
-  sendApplication(input:sendMailInput!): Mail!
+  sendApplication(input:sendMailInput!): Application!
   sendNormalMail(input:sendNormalMailInput!): Mail!
   startChat(particpantMail: String!): Room!
   sendMessage(input:sendMessageInput!): Room!
+  createPatient(input:PatientInput!): User!
   closeRoom(roomid: String!): Room!
   openRoom(roomid: String!): Room!
   addToHospital(userMail: String!, hospitalId: String!):Hospital!

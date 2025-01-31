@@ -8,6 +8,22 @@ import (
 	"strconv"
 )
 
+type Application struct {
+	ID            string    `json:"id"`
+	Content       string    `json:"content"`
+	PatientName   string    `json:"patientName"`
+	Sender        string    `json:"sender"`
+	Receiver      string    `json:"receiver"`
+	PatientAge    string    `json:"patientAge"`
+	Documents     []*string `json:"documents,omitempty"`
+	PatientGender string    `json:"patientGender"`
+	Passport      string    `json:"passport"`
+	PhoneNumber   string    `json:"phoneNumber"`
+	Allergies     string    `json:"allergies"`
+	Type          EmailType `json:"type"`
+	CreatedAt     string    `json:"createdAt"`
+}
+
 type AuthPayload struct {
 	Token string `json:"token"`
 	User  *User  `json:"user"`
@@ -77,6 +93,13 @@ type Participants struct {
 	Doctors []string `json:"doctors"`
 }
 
+type PatientInput struct {
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	ProfilePic string `json:"profilePic"`
+	Password   string `json:"password"`
+}
+
 type Query struct {
 }
 
@@ -116,6 +139,12 @@ type UserInput struct {
 type SendMailInput struct {
 	HospitalID        string    `json:"hospitalId"`
 	Content           string    `json:"content"`
+	PatientName       string    `json:"patientName"`
+	PatientAge        string    `json:"patientAge"`
+	PatientGender     string    `json:"patientGender"`
+	PhoneNumber       string    `json:"phoneNumber"`
+	Passport          string    `json:"passport"`
+	Allergies         string    `json:"allergies"`
 	Documents         []*string `json:"documents,omitempty"`
 	RazorpayPaymentID string    `json:"razorpay_payment_id"`
 	RazorpayOrderID   string    `json:"razorpay_order_id"`

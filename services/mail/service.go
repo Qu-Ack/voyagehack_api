@@ -3,6 +3,7 @@ package mail
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/Qu-Ack/voyagehack_api/services/user"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -75,16 +76,28 @@ func (m *MailService) GetMailBox(ctx context.Context, userEmail string) (*Public
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(mailBox)
 
 	return m.repo.AddMailsToMailBox(ctx, mailBox.ID)
 }
 
-func (m *MailService) GetMail(ctx context.Context, mailId string) (*Mail, error) {
+func (m *MailService) GetMail(ctx context.Context, mailId string, requester string) (*Mail, error) {
 	mailBoxObjectId, err := primitive.ObjectIDFromHex(mailId)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return m.repo.getEmail(ctx, mailBoxObjectId)
+	mail, err := m.repo.getEmail(ctx, mailBoxObjectId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	if requester == mail.Sender || requester == mail.Receiver {
+		return mail, nil
+	}
+
+	return nil, errors.New("You are not authorized to view this mail")
+
 }

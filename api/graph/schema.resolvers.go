@@ -166,11 +166,13 @@ func (r *mutationResolver) CreateTestUser(ctx context.Context, input model.TestU
 }
 
 // SendApplication is the resolver for the sendApplication field.
-func (r *mutationResolver) SendApplication(ctx context.Context, input model.SendMailInput) (*model.Mail, error) {
+func (r *mutationResolver) SendApplication(ctx context.Context, input model.SendMailInput) (*model.Application, error) {
 	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")
 	}
+
+	fmt.Println("error in sendApplication")
 
 	err := r.PaymentService.ValidatePayment(&payment.ValidatePaymentRequest{
 		RazorpayPaymentId: input.RazorpayPaymentID,
@@ -183,6 +185,7 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 	})
 
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 
@@ -197,19 +200,27 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 	user, err := r.UserService.Me(ctx, receiverUserId.Hex())
 
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 
 	mail, err := r.MailService.SendApplication(ctx, &mail.Mail{
-		Content:   input.Content,
-		Sender:    authedUser.Email,
-		Receiver:  user.Email,
-		Documents: input.Documents,
-		Type:      mail.Application,
-		CreatedAt: primitive.NewDateTimeFromTime(time.Now()),
+		Content:       input.Content,
+		Sender:        authedUser.Email,
+		Passport:      input.Passport,
+		PatientGender: input.PatientGender,
+		PatientName:   input.PatientName,
+		Allergies:     input.Allergies,
+		PatientAge:    input.PatientAge,
+		PhoneNumber:   input.PhoneNumber,
+		Receiver:      user.Email,
+		Documents:     input.Documents,
+		Type:          mail.Application,
+		CreatedAt:     primitive.NewDateTimeFromTime(time.Now()),
 	})
 
 	if err != nil {
+		fmt.Println(err)
 		return nil, err
 	}
 
@@ -220,6 +231,7 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 			Receiver:  mail.Receiver,
 			Content:   mail.Content,
 			Documents: mail.Documents,
+			Type:      model.EmailType(mail.Type),
 			CreatedAt: mail.CreatedAt.Time().String(),
 		},
 	})
@@ -229,18 +241,26 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 			Sender:    mail.Sender,
 			Receiver:  mail.Receiver,
 			Content:   mail.Content,
+			Type:      model.EmailType(mail.Type),
 			Documents: mail.Documents,
 			CreatedAt: mail.CreatedAt.Time().String(),
 		},
 	})
 
-	return &model.Mail{
-		ID:        mail.ID.Hex(),
-		Sender:    mail.Sender,
-		Receiver:  mail.Receiver,
-		Content:   mail.Content,
-		Documents: mail.Documents,
-		CreatedAt: mail.CreatedAt.Time().String(),
+	return &model.Application{
+		ID:            mail.ID.Hex(),
+		Sender:        mail.Sender,
+		Receiver:      mail.Receiver,
+		Content:       mail.Content,
+		Type:          model.EmailType(mail.Type),
+		PatientName:   mail.PatientName,
+		PhoneNumber:   mail.PhoneNumber,
+		Passport:      mail.Passport,
+		PatientAge:    mail.PatientAge,
+		PatientGender: mail.PatientGender,
+		Allergies:     mail.Allergies,
+		Documents:     mail.Documents,
+		CreatedAt:     mail.CreatedAt.Time().String(),
 	}, nil
 }
 
@@ -274,6 +294,7 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 			Sender:    mail.Sender,
 			Receiver:  mail.Receiver,
 			Content:   mail.Content,
+			Type:      model.EmailType(mail.Type),
 			Documents: mail.Documents,
 			CreatedAt: mail.CreatedAt.Time().String(),
 		},
@@ -283,6 +304,7 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 			ID:        mail.ID.Hex(),
 			Sender:    mail.Sender,
 			Receiver:  mail.Receiver,
+			Type:      model.EmailType(mail.Type),
 			Content:   mail.Content,
 			Documents: mail.Documents,
 			CreatedAt: mail.CreatedAt.Time().String(),
@@ -392,6 +414,29 @@ func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMess
 	}, nil
 }
 
+// CreatePatient is the resolver for the createPatient field.
+func (r *mutationResolver) CreatePatient(ctx context.Context, input model.PatientInput) (*model.User, error) {
+	user, err := r.UserService.CreatePatient(ctx, user.UserInput{
+		Email:      input.Email,
+		ProfilePic: input.ProfilePic,
+		Name:       input.Name,
+		Password:   input.Password,
+		Role:       user.RolePatient,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.User{
+		ID:         user.ID,
+		Name:       user.Name,
+		Email:      user.Email,
+		Role:       model.Role(user.Role),
+		ProfilePic: user.ProfilePic,
+	}, nil
+}
+
 // CloseRoom is the resolver for the closeRoom field.
 func (r *mutationResolver) CloseRoom(ctx context.Context, roomid string) (*model.Room, error) {
 	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
@@ -470,30 +515,6 @@ func (r *queryResolver) MyDoctorProfile(ctx context.Context) (*model.Doctor, err
 	panic(fmt.Errorf("not implemented: MyDoctorProfile - myDoctorProfile"))
 }
 
-// GetEmailByID is the resolver for the getEmailByID field.
-func (r *queryResolver) GetEmailByID(ctx context.Context, id string) (*model.Mail, error) {
-	_, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
-	if !ok {
-		return nil, fmt.Errorf("unauthorized: user not found in context")
-	}
-
-	mail, err := r.MailService.GetMail(ctx, id)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &model.Mail{
-		ID:        mail.ID.Hex(),
-		Content:   mail.Content,
-		Sender:    mail.Sender,
-		Receiver:  mail.Receiver,
-		Documents: mail.Documents,
-		Type:      model.EmailType(mail.Type),
-		CreatedAt: mail.CreatedAt.Time().String(),
-	}, nil
-}
-
 // GetMailBox is the resolver for the getMailBox field.
 func (r *queryResolver) GetMailBox(ctx context.Context) (*model.MailBox, error) {
 	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
@@ -513,6 +534,7 @@ func (r *queryResolver) GetMailBox(ctx context.Context) (*model.MailBox, error) 
 	receivedObjectids := convertObjectIDToStringSlice(mailbox.MailBox.Received)
 
 	return &model.MailBox{
+		ID:             mailbox.MailBox.ID.Hex(),
 		Sentmails:      sentmails,
 		ReceivedEmails: receivedmails,
 		Sent:           sentObjectids,
@@ -550,6 +572,34 @@ func (r *queryResolver) GetS3Url(ctx context.Context) (string, error) {
 	}
 
 	return r.UploadService.GetPresignedURL()
+}
+
+// GetMailByID is the resolver for the getMailById field.
+func (r *queryResolver) GetMailByID(ctx context.Context, id string) (*model.Application, error) {
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	mail, err := r.MailService.GetMail(ctx, id, authedUser.Email)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Application{
+		ID:            mail.ID.Hex(),
+		Content:       mail.Content,
+		PatientName:   mail.PatientName,
+		Passport:      mail.Passport,
+		Documents:     mail.Documents,
+		CreatedAt:     mail.CreatedAt.Time().String(),
+		Type:          model.EmailType(mail.Type),
+		Sender:        mail.Sender,
+		Receiver:      mail.Receiver,
+		PatientGender: mail.PatientGender,
+		PatientAge:    mail.PatientAge,
+	}, err
 }
 
 // GetOrderID is the resolver for the getOrderId field.

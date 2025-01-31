@@ -5,9 +5,10 @@ import "go.mongodb.org/mongo-driver/bson/primitive"
 type Role string
 
 const (
-	RoleRoot   Role = "ROOT"
-	RoleDoctor Role = "DOCTOR"
-	RoleStaff  Role = "STAFF"
+	RoleRoot    Role = "ROOT"
+	RoleDoctor  Role = "DOCTOR"
+	RoleStaff   Role = "STAFF"
+	RolePatient Role = "PATIENT"
 )
 
 type User struct {

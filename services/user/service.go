@@ -144,3 +144,13 @@ func (u *UserService) CreateTestUser(ctx context.Context, userInput UserInput) (
 
 	return u.repo.createUser(ctx, userInput)
 }
+
+func (u *UserService) CreatePatient(ctx context.Context, userInput UserInput) (*PublicUser, error) {
+	_, err := u.repo.getUserByEmail(ctx, userInput.Email)
+
+	if err == nil {
+		return nil, errors.New("user already exists")
+	}
+
+	return u.repo.createUser(ctx, userInput)
+}

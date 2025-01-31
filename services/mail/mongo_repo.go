@@ -101,6 +101,7 @@ func (m *MailRepo) createMailBox(ctx context.Context, mailId string) (*MailBox, 
 
 func (m *MailRepo) AddMailsToMailBox(ctx context.Context, mailBoxId primitive.ObjectID) (*PublicMailBox, error) {
 	mailBoxCollection := m.db.Collection("mailbox")
+
 	pipeline := mongo.Pipeline{
 		{{"$match", bson.M{"_id": mailBoxId}}},
 		{{"$lookup", bson.M{
@@ -111,34 +112,53 @@ func (m *MailRepo) AddMailsToMailBox(ctx context.Context, mailBoxId primitive.Ob
 		}}},
 		{{"$lookup", bson.M{
 			"from":         "mails",
-			"localField":   "sent",
+			"localField":   "received", // Changed from "sent" to "received"
 			"foreignField": "_id",
 			"as":           "ReceivedEmails",
 		}}},
 		{{"$project", bson.M{
+			"_id":            1,
+			"email":          1,
 			"sent":           1,
 			"received":       1,
-			"Email":          1,
 			"SentEmails":     1,
 			"ReceivedEmails": 1,
 		}}},
 	}
 
 	cursor, err := mailBoxCollection.Aggregate(ctx, pipeline)
-
 	if err != nil {
 		return nil, err
 	}
 	defer cursor.Close(ctx)
-	var publicMailBox PublicMailBox
+
+	var result struct {
+		ID             primitive.ObjectID   `bson:"_id"`
+		Email          string               `bson:"email"`
+		Sent           []primitive.ObjectID `bson:"sent"`
+		Received       []primitive.ObjectID `bson:"received"`
+		SentEmails     []Mail               `bson:"SentEmails"`
+		ReceivedEmails []Mail               `bson:"ReceivedEmails"`
+	}
+
 	if cursor.Next(ctx) {
-		err := cursor.Decode(&publicMailBox)
+		err := cursor.Decode(&result)
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		return nil, errors.New("mail box not found")
+
+		publicMailBox := PublicMailBox{
+			MailBox: MailBox{
+				ID:       result.ID,
+				Email:    result.Email,
+				Sent:     result.Sent,
+				Received: result.Received,
+			},
+			SentEMails:     result.SentEmails,
+			ReceivedEmails: result.ReceivedEmails,
+		}
+		return &publicMailBox, nil
 	}
 
-	return &publicMailBox, nil
+	return nil, errors.New("mail box not found")
 }
