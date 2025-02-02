@@ -1,9 +1,11 @@
 package graph
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/Qu-Ack/voyagehack_api/api/graph/model"
+	"github.com/Qu-Ack/voyagehack_api/services/hospital"
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/messaging"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -28,6 +30,20 @@ func convertObjectIDToStringSlice(ids []primitive.ObjectID) []*string {
 	}
 	return result
 }
+func convertHospitalReviewsToModelReviews(reviews []hospital.Review) []*model.Review {
+	result := make([]*model.Review, len(reviews))
+
+	for i, review := range reviews {
+		newReview := &model.Review{
+			Content: review.Content,
+			Author:  review.Author.Hex(),
+		}
+		result[i] = newReview
+	}
+
+	return result
+}
+
 func convertToModelMail(m mail.Mail) *model.Mail {
 	return &model.Mail{
 		ID:        m.ID.Hex(),
@@ -72,10 +88,28 @@ func convertParticipants(participants []primitive.ObjectID) []string {
 	return result
 }
 
-func selectRandomParticipant(participants []primitive.ObjectID) primitive.ObjectID {
+func selectRandomParticipant(participants []primitive.ObjectID) (primitive.ObjectID, error) {
+	if len(participants) == 0 {
+		return primitive.NilObjectID, fmt.Errorf("no participants available")
+	}
+
+	// Seed should only be called once in init()
 	rand.Seed(uint64(time.Now().UnixNano()))
 
 	randomIndex := rand.Intn(len(participants))
 
-	return participants[randomIndex]
+	return participants[randomIndex], nil
+}
+
+func convertStringToPointerStringArray(arr []string) []*string {
+	if arr == nil {
+		return nil
+	}
+
+	result := make([]*string, len(arr))
+
+	for i, entity := range arr {
+		result[i] = &entity
+	}
+	return result
 }

@@ -22,20 +22,22 @@ type EMAIL string
 const (
 	Application EMAIL = "APPLICATION"
 	Normal      EMAIL = "NORMAL"
+	Invitation  EMAIL = "INVITATION"
 )
 
 type Mail struct {
-	ID            primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Sender        string             `bson:"sender,omitempty" json:"sender"`
-	Receiver      string             `bson:"receiver,omitempty" json:"receiver"`
-	Content       string             `bson:"content,omitempty" json:"content"`
-	Passport      string             `bson:"passport,omitempty" json:"passport"`
-	Allergies     string             `bson:"allergies,omitempty" json:"allergies"`
-	PatientGender string             `bson:"patientGender,omitempty" json:"patientGender"`
-	PhoneNumber   string             `bson:"phoneNumber,omitempty" json:"phoneNumber"`
-	PatientName   string             `bson:"patientName,omitempty" json:"patientName"`
-	PatientAge    string             `bson:"patientAge,omitempty" json:"patientAge"`
-	Documents     []*string          `bson:"documents,omitempty" json:"documents"`
-	Type          EMAIL              `bson:"type,omitempty" json:"type"`
-	CreatedAt     primitive.DateTime `bson:"createdAt,omitempty" json:"createdAt"`
+	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Sender         string             `bson:"sender,omitempty" json:"sender"`
+	Receiver       string             `bson:"receiver,omitempty" json:"receiver"`
+	Content        string             `bson:"content,omitempty" json:"content"`
+	Passport       string             `bson:"passport,omitempty" json:"passport"`
+	Allergies      string             `bson:"allergies,omitempty" json:"allergies"`
+	PatientGender  string             `bson:"patientGender,omitempty" json:"patientGender"`
+	PhoneNumber    string             `bson:"phoneNumber,omitempty" json:"phoneNumber"`
+	PatientName    string             `bson:"patientName,omitempty" json:"patientName"`
+	ForwardedChain []string           `bson:"forwardedChain,omitempty" json:"forwardedChain"`
+	PatientAge     string             `bson:"patientAge,omitempty" json:"patientAge"`
+	Documents      []*string          `bson:"documents,omitempty" json:"documents"`
+	Type           EMAIL              `bson:"type,omitempty" json:"type"`
+	CreatedAt      primitive.DateTime `bson:"createdAt,omitempty" json:"createdAt"`
 }

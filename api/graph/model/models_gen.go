@@ -8,25 +8,62 @@ import (
 	"strconv"
 )
 
+type AddressInformation struct {
+	StreetAddress *string `json:"streetAddress,omitempty"`
+	City          *string `json:"city,omitempty"`
+	State         *string `json:"state,omitempty"`
+	PinCode       *string `json:"pinCode,omitempty"`
+}
+
+type Amenities struct {
+	BedCapacity    *BedCapacity  `json:"bedCapacity,omitempty"`
+	MedicalStaff   *MedicalStaff `json:"medicalStaff,omitempty"`
+	Facilities     []*string     `json:"facilities,omitempty"`
+	Specialization []*string     `json:"specialization,omitempty"`
+}
+
 type Application struct {
-	ID            string    `json:"id"`
-	Content       string    `json:"content"`
-	PatientName   string    `json:"patientName"`
-	Sender        string    `json:"sender"`
-	Receiver      string    `json:"receiver"`
-	PatientAge    string    `json:"patientAge"`
-	Documents     []*string `json:"documents,omitempty"`
-	PatientGender string    `json:"patientGender"`
-	Passport      string    `json:"passport"`
-	PhoneNumber   string    `json:"phoneNumber"`
-	Allergies     string    `json:"allergies"`
-	Type          EmailType `json:"type"`
-	CreatedAt     string    `json:"createdAt"`
+	ID             string    `json:"id"`
+	Content        string    `json:"content"`
+	PatientName    string    `json:"patientName"`
+	Sender         string    `json:"sender"`
+	Receiver       string    `json:"receiver"`
+	PatientAge     string    `json:"patientAge"`
+	Documents      []*string `json:"documents,omitempty"`
+	PatientGender  string    `json:"patientGender"`
+	Passport       string    `json:"passport"`
+	PhoneNumber    string    `json:"phoneNumber"`
+	Allergies      string    `json:"allergies"`
+	Type           EmailType `json:"type"`
+	ForwardedChain []string  `json:"ForwardedChain"`
+	CreatedAt      string    `json:"createdAt"`
 }
 
 type AuthPayload struct {
 	Token string `json:"token"`
 	User  *User  `json:"user"`
+}
+
+type BasicInfo struct {
+	HospitalName       *string             `json:"hospitalName,omitempty"`
+	RegistrationNumber *string             `json:"registrationNumber,omitempty"`
+	ContactInformation *ContactInformation `json:"contactInformation,omitempty"`
+	AddressInformation *AddressInformation `json:"addressInformation,omitempty"`
+	OperatingHours     *OperatingHours     `json:"operatingHours,omitempty"`
+}
+
+type BedCapacity struct {
+	GeneralWardBeds *int32 `json:"generalWardBeds,omitempty"`
+	PrivateRoomBeds *int32 `json:"privateRoomBeds,omitempty"`
+	EmergencyBeds   *int32 `json:"emergencyBeds,omitempty"`
+	IcuBeds         *int32 `json:"icuBeds,omitempty"`
+}
+
+type ContactInformation struct {
+	ContactPersonName *string `json:"contactPersonName,omitempty"`
+	ContactNumber     *string `json:"contactNumber,omitempty"`
+	ContactEmail      *string `json:"contactEmail,omitempty"`
+	Website           *string `json:"website,omitempty"`
 }
 
 type Doctor struct {
@@ -36,13 +73,27 @@ type Doctor struct {
 }
 
 type DoctorInput struct {
-	Specialty string   `json:"specialty"`
-	Documents []string `json:"documents"`
-	UserID    string   `json:"userId"`
+	Specialty  string   `json:"specialty"`
+	Documents  []string `json:"documents"`
+	Name       string   `json:"name"`
+	Password   string   `json:"password"`
+	Email      string   `json:"email"`
+	HospitalID string   `json:"hospitalId"`
+	ProfilePic string   `json:"profilePic"`
 }
 
 type Hospital struct {
-	Participants *Participants `json:"participants,omitempty"`
+	ID                 string              `json:"id"`
+	BasicInfo          *BasicInfo          `json:"basicInfo,omitempty"`
+	Media              *Media              `json:"media,omitempty"`
+	Amenities          *Amenities          `json:"amenities,omitempty"`
+	OnSiteVerification *OnSiteVerification `json:"onSiteVerification,omitempty"`
+	OnsiteRating       *int32              `json:"onsiteRating,omitempty"`
+	Reviews            []*Review           `json:"reviews"`
+	PatientRating      *int32              `json:"patientRating,omitempty"`
+	Ratings            []int32             `json:"ratings"`
+	ConsultationFee    *int32              `json:"consultationFee,omitempty"`
+	Participants       *Participants       `json:"participants,omitempty"`
 }
 
 type LoginInput struct {
@@ -51,13 +102,14 @@ type LoginInput struct {
 }
 
 type Mail struct {
-	ID        string    `json:"id"`
-	Sender    string    `json:"sender"`
-	Receiver  string    `json:"receiver"`
-	Content   string    `json:"content"`
-	Documents []*string `json:"documents"`
-	Type      EmailType `json:"type"`
-	CreatedAt string    `json:"createdAt"`
+	ID             string    `json:"id"`
+	Sender         string    `json:"sender"`
+	Receiver       string    `json:"receiver"`
+	Content        string    `json:"content"`
+	Documents      []*string `json:"documents"`
+	Type           EmailType `json:"type"`
+	ForwardedChain []string  `json:"ForwardedChain"`
+	CreatedAt      string    `json:"createdAt"`
 }
 
 type MailBox struct {
@@ -70,8 +122,21 @@ type MailBox struct {
 }
 
 type MailBoxSubscriptionResponse struct {
-	Sent     *Mail `json:"sent,omitempty"`
-	Received *Mail `json:"received,omitempty"`
+	Sent     *Application `json:"sent,omitempty"`
+	Received *Application `json:"received,omitempty"`
+}
+
+type Media struct {
+	FrontURL     *string `json:"frontUrl,omitempty"`
+	ReceptionURL *string `json:"receptionUrl,omitempty"`
+	OperationURL *string `json:"operationUrl,omitempty"`
+}
+
+type MedicalStaff struct {
+	PermenantDoctors    *int32 `json:"permenantDoctors,omitempty"`
+	VisitingConsultants *int32 `json:"visitingConsultants,omitempty"`
+	Nurses              *int32 `json:"nurses,omitempty"`
+	SupportStaff        *int32 `json:"supportStaff,omitempty"`
 }
 
 type Message struct {
@@ -85,6 +150,17 @@ type MessageSubscriptionResponse struct {
 }
 
 type Mutation struct {
+}
+
+type OnSiteVerification struct {
+	PreferredDate       *string              `json:"preferredDate,omitempty"`
+	PreferredTime       *string              `json:"preferredTime,omitempty"`
+	VerificationContact *VerificationContact `json:"verificationContact,omitempty"`
+}
+
+type OperatingHours struct {
+	OpeningTime *string `json:"openingTime,omitempty"`
+	ClosingTime *string `json:"closingTime,omitempty"`
 }
 
 type Participants struct {
@@ -103,10 +179,16 @@ type PatientInput struct {
 type Query struct {
 }
 
+type Review struct {
+	Content string `json:"content"`
+	Author  string `json:"author"`
+}
+
 type Room struct {
 	ID           string     `json:"id"`
 	Messages     []*Message `json:"messages"`
 	Participants []string   `json:"participants"`
+	State        string     `json:"state"`
 }
 
 type Subscription struct {
@@ -134,6 +216,19 @@ type UserInput struct {
 	ProfilePic string `json:"profilePic"`
 	Password   string `json:"password"`
 	HospitalID string `json:"hospitalId"`
+}
+
+type VerificationContact struct {
+	Name           *string `json:"name,omitempty"`
+	Position       *string `json:"position,omitempty"`
+	PhoneNumber    *string `json:"phoneNumber,omitempty"`
+	AlternatePhone *string `json:"alternatePhone,omitempty"`
+}
+
+type SendInvitationInput struct {
+	Receiver  string   `json:"receiver"`
+	Content   string   `json:"content"`
+	Documents []string `json:"documents"`
 }
 
 type SendMailInput struct {

@@ -36,7 +36,7 @@ func (h *HospitalRepo) AddRootToHospital(ctx context.Context, hospitalId primiti
 
 	var hospital Hospital
 
-	err := hospitalCollection.FindOneAndUpdate(ctx, bson.M{"_id": hospitalId}, bson.D{{"$push", bson.D{{"participants", bson.D{{"roots", rootId}}}}}}).Decode(&hospital)
+	err := hospitalCollection.FindOneAndUpdate(ctx, bson.M{"_id": hospitalId}, bson.D{{"$push", bson.D{{"Participants.RootUsers", rootId}}}}).Decode(&hospital)
 
 	if err != nil {
 		return nil, err
@@ -50,7 +50,7 @@ func (h *HospitalRepo) addStaffToHospital(ctx context.Context, hospitalId primit
 
 	var hospital Hospital
 
-	err := hospitalCollection.FindOneAndUpdate(ctx, bson.M{"_id": hospitalId}, bson.D{{"$push", bson.D{{"participants", bson.D{{"staff", staffId}}}}}}).Decode(&hospital)
+	err := hospitalCollection.FindOneAndUpdate(ctx, bson.M{"_id": hospitalId}, bson.D{{"$push", bson.D{{"Participants.Staff", staffId}}}}).Decode(&hospital)
 
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (h *HospitalRepo) addDoctorToHospital(ctx context.Context, hospitalId primi
 
 	var hospital Hospital
 
-	err := hospitalCollection.FindOneAndUpdate(ctx, bson.M{"_id": hospitalId}, bson.D{{"$push", bson.D{{"participants", bson.D{{"doctors", doctorId}}}}}}).Decode(&hospital)
+	err := hospitalCollection.FindOneAndUpdate(ctx, bson.M{"_id": hospitalId}, bson.D{{"$push", bson.D{{"Participants.Doctors", doctorId}}}}).Decode(&hospital)
 
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ func (h *HospitalRepo) checkRootUser(ctx context.Context, participantId primitiv
 	hospitalCollection := h.db.Collection("hospitals")
 
 	filter := bson.M{
-		"participants.roots": participantId,
+		"Participants.RootUsers": participantId,
 	}
 
 	var hospital Hospital
@@ -95,7 +95,7 @@ func (h *HospitalRepo) checkStaffUser(ctx context.Context, participantId primiti
 	hospitalCollection := h.db.Collection("hospitals")
 
 	filter := bson.M{
-		"participants.staff": participantId,
+		"Participants.Staff": participantId,
 	}
 
 	var hospital Hospital
@@ -111,11 +111,36 @@ func (h *HospitalRepo) checkDoctorUser(ctx context.Context, participantId primit
 	hospitalCollection := h.db.Collection("hospitals")
 
 	filter := bson.M{
-		"participants.doctors": participantId,
+		"Participants.Doctors": participantId,
 	}
 
 	var hospital Hospital
 	err := hospitalCollection.FindOne(ctx, filter).Decode(&hospital)
+	if err != nil {
+		return nil, err
+	}
+
+	return &hospital, nil
+}
+
+func (h *HospitalRepo) addReview(ctx context.Context, review *Review, hospitalId primitive.ObjectID) (*Hospital, error) {
+	hospitalCollection := h.db.Collection("hospitals")
+
+	var hospital Hospital
+	err := hospitalCollection.FindOneAndUpdate(ctx, bson.M{"_id": hospitalId}, bson.D{{"$push", bson.D{{"Reviews", review}}}}).Decode(&hospital)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, err
+}
+
+func (h *HospitalRepo) addRating(ctx context.Context, rating int32, hospitalId primitive.ObjectID) (*Hospital, error) {
+	hospitalCollection := h.db.Collection("hospitals")
+
+	var hospital Hospital
+	err := hospitalCollection.FindOneAndUpdate(ctx, bson.M{"_id": hospitalId}, bson.D{{"$push", bson.D{{"Ratings", rating}}}}).Decode(&hospital)
 	if err != nil {
 		return nil, err
 	}

@@ -2,6 +2,7 @@ package observers
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/Qu-Ack/voyagehack_api/api/graph/model"
@@ -41,6 +42,7 @@ func (o *ObserverService) subscribetomail(ctx context.Context, resourceId string
 	o.observers[resourceId].Channels["MAIL"] = ch
 	o.observers[resourceId].mu.Unlock()
 
+	fmt.Println("We have subscribed To Mail", o.observers[resourceId])
 	go func() {
 		<-ctx.Done()
 		o.UnSubscribe(resourceId, "MAIL")
@@ -51,6 +53,7 @@ func (o *ObserverService) subscribetomail(ctx context.Context, resourceId string
 }
 
 func (o *ObserverService) subscribetomessage(ctx context.Context, resourceId string) <-chan *model.MessageSubscriptionResponse {
+	fmt.Println("in subscribe to message")
 	o.mu.Lock()
 	defer o.mu.Unlock()
 
@@ -66,6 +69,7 @@ func (o *ObserverService) subscribetomessage(ctx context.Context, resourceId str
 	o.observers[resourceId].mu.Lock()
 	o.observers[resourceId].Channels["MESSAGE"] = ch
 	o.observers[resourceId].mu.Unlock()
+	fmt.Println(o.observers[resourceId])
 
 	go func() {
 		<-ctx.Done()
@@ -108,14 +112,24 @@ func (o *ObserverService) PublishToMail(message *model.MailBoxSubscriptionRespon
 	observer, ok := o.observers[resourceId]
 	o.mu.RUnlock()
 
+	fmt.Println("observer is ", observer)
 	if !ok {
+		return
+	}
+
+	observer.mu.Lock()
+	chinterface, exists := observer.Channels["MAIL"]
+	observer.mu.Unlock()
+
+	if !exists {
+		fmt.Println("NO MAIL CHANNEL")
 		return
 	}
 
 	observer.mu.Lock()
 	defer observer.mu.Unlock()
 
-	observer.Channels["MAIL"].(chan *model.MailBoxSubscriptionResponse) <- message
+	chinterface.(chan *model.MailBoxSubscriptionResponse) <- message
 
 }
 
@@ -123,15 +137,26 @@ func (o *ObserverService) PublishToMessage(message *model.MessageSubscriptionRes
 	o.mu.RLock()
 	observer, ok := o.observers[resourceId]
 	o.mu.RUnlock()
+	fmt.Println(observer)
 
 	if !ok {
+		fmt.Println("returning in the ok")
+		return
+	}
+
+	observer.mu.Lock()
+	chinterface, exists := observer.Channels["MESSAGE"]
+	observer.mu.Unlock()
+
+	if !exists {
+		fmt.Println("NO MESSAGE CHANNEL")
 		return
 	}
 
 	observer.mu.Lock()
 	defer observer.mu.Unlock()
 
-	observer.Channels["MESSAGE"].(chan *model.MessageSubscriptionResponse) <- message
+	chinterface.(chan *model.MessageSubscriptionResponse) <- message
 
 }
 
@@ -140,6 +165,7 @@ func (o *ObserverService) SubscribeToMail(ctx context.Context, mailId string) <-
 }
 
 func (o *ObserverService) PublishMail(receiver string, message *model.MailBoxSubscriptionResponse) {
+	fmt.Println("in publish mail time")
 	o.PublishToMail(message, receiver)
 }
 
@@ -148,5 +174,6 @@ func (o *ObserverService) SubscribeToMessage(ctx context.Context, mailId string)
 }
 
 func (o *ObserverService) PublishMessage(receiver string, message *model.MessageSubscriptionResponse) {
+	fmt.Println(receiver)
 	o.PublishToMessage(message, receiver)
 }

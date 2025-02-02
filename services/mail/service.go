@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/Qu-Ack/voyagehack_api/services/user"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -49,7 +50,6 @@ func (m *MailService) SendNormalMail(ctx context.Context, mail *Mail, requester 
 	if requester.Role == "PATIENT" {
 		return nil, errors.New("Can't send emails")
 	}
-	mail.Type = Normal
 	created, err := m.repo.createEmail(ctx, mail)
 
 	if err != nil {
@@ -65,6 +65,7 @@ func (m *MailService) SendNormalMail(ctx context.Context, mail *Mail, requester 
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println(created)
 
 	return created, nil
 }
@@ -81,6 +82,37 @@ func (m *MailService) GetMailBox(ctx context.Context, userEmail string) (*Public
 	return m.repo.AddMailsToMailBox(ctx, mailBox.ID)
 }
 
+func (m *MailService) ForwardMail(ctx context.Context, forwardTo string, mailId string, requester user.PublicUser) (*Mail, error) {
+
+	if requester.Role == user.RolePatient {
+		return nil, errors.New("not allowed to forward mails")
+	}
+
+	mailObjectId, err := primitive.ObjectIDFromHex(mailId)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.repo.addForwarded(ctx, forwardTo, mailObjectId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.repo.AddMailToReceived(ctx, forwardTo, mailObjectId)
+	if err != nil {
+		return nil, err
+	}
+
+	err = m.repo.AddMailToSent(ctx, requester.Email, mailObjectId)
+	if err != nil {
+		return nil, err
+	}
+
+	return m.repo.getEmail(ctx, mailObjectId)
+
+}
+
 func (m *MailService) GetMail(ctx context.Context, mailId string, requester string) (*Mail, error) {
 	mailBoxObjectId, err := primitive.ObjectIDFromHex(mailId)
 
@@ -94,7 +126,7 @@ func (m *MailService) GetMail(ctx context.Context, mailId string, requester stri
 		return nil, err
 	}
 
-	if requester == mail.Sender || requester == mail.Receiver {
+	if (requester == mail.Sender || requester == mail.Receiver) || slices.Contains(mail.ForwardedChain, requester) {
 		return mail, nil
 	}
 

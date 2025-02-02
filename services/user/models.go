@@ -21,10 +21,34 @@ type User struct {
 }
 
 type Doctor struct {
-	ID        primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	UserID    primitive.ObjectID `bson:"userId" json:"userId"`
-	Specialty string             `bson:"specialty" json:"specialty"`
-	Documents []string           `bson:"documents" json:"documents"`
+	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name       string             `bson:"name" json:"name"`
+	Email      string             `bson:"email" json:"email"`
+	ProfilePic string             `bson:"profilePic" json:"profilePic"`
+	Password   string             `bson:"password" json:"-"`
+	Role       Role               `bson:"role" json:"role"`
+	Specialty  string             `bson:"specialty" json:"specialty"`
+	Documents  []string           `bson:"documents" json:"documents"`
+}
+
+type PublicDoctor struct {
+	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	Name       string             `bson:"name" json:"name"`
+	Email      string             `bson:"email" json:"email"`
+	ProfilePic string             `bson:"profilePic" json:"profilePic"`
+	Role       Role               `bson:"role" json:"role"`
+	Specialty  string             `bson:"specialty" json:"specialty"`
+	Documents  []string           `bson:"documents" json:"documents"`
+}
+
+type DoctorInput struct {
+	Name       string
+	Email      string
+	ProfilePic string
+	Password   string
+	Role       Role
+	Specialty  string
+	Documents  []string
 }
 
 type UserInput struct {

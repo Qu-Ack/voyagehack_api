@@ -43,7 +43,49 @@ func (r *mutationResolver) Login(ctx context.Context, input model.LoginInput) (*
 
 // CreateDoctor is the resolver for the createDoctor field.
 func (r *mutationResolver) CreateDoctor(ctx context.Context, input model.DoctorInput) (*model.Doctor, error) {
-	panic(fmt.Errorf("not implemented: CreateDoctor - createDoctor"))
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	doctor, err := r.UserService.CreateDoctor(ctx, user.DoctorInput{
+		Specialty:  input.Specialty,
+		ProfilePic: input.ProfilePic,
+		Password:   input.Password,
+		Email:      input.Email,
+		Name:       input.Name,
+		Documents:  input.Documents,
+	}, user.PublicUser{
+		ID:    authedUser.ID,
+		Email: authedUser.Email,
+		Role:  user.Role(authedUser.Role),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	fmt.Println(input.HospitalID)
+	_, err = r.HospitalService.AddParticipant(ctx, "DOCTOR", doctor.ID.Hex(), input.HospitalID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.MailService.InitializeMailBox(ctx, doctor.Email)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Doctor{
+		User: &model.User{
+			ID:    doctor.ID.Hex(),
+			Name:  doctor.Name,
+			Role:  model.Role(doctor.Role),
+			Email: string(doctor.Role),
+		},
+		Specialty: doctor.Specialty,
+		Documents: doctor.Documents,
+	}, nil
 }
 
 // CreateRoot is the resolver for the createRoot field.
@@ -195,7 +237,17 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 		return nil, err
 	}
 
-	receiverUserId := selectRandomParticipant(hospital.Participants.Roots)
+	fmt.Println(hospital)
+
+	fmt.Println(fmt.Sprintf("GETTING THE HOSPITAL %s", hospital.ID))
+
+	receiverUserId, err := selectRandomParticipant(hospital.Participants.RootUsers)
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("RECEIVED USER ID IS %s", receiverUserId)
 
 	user, err := r.UserService.Me(ctx, receiverUserId.Hex())
 
@@ -203,6 +255,8 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 		fmt.Println(err)
 		return nil, err
 	}
+
+	fmt.Println(fmt.Sprintf("GETTING THE USER %s", user.ID))
 
 	mail, err := r.MailService.SendApplication(ctx, &mail.Mail{
 		Content:       input.Content,
@@ -224,43 +278,48 @@ func (r *mutationResolver) SendApplication(ctx context.Context, input model.Send
 		return nil, err
 	}
 
+	fmt.Println("GETTING THE APPLICATION %s", mail.ID)
+
 	r.ObserverService.PublishMail(user.Email, &model.MailBoxSubscriptionResponse{
-		Received: &model.Mail{
-			ID:        mail.ID.Hex(),
-			Sender:    mail.Sender,
-			Receiver:  mail.Receiver,
-			Content:   mail.Content,
-			Documents: mail.Documents,
-			Type:      model.EmailType(mail.Type),
-			CreatedAt: mail.CreatedAt.Time().String(),
+		Received: &model.Application{
+			ID:             mail.ID.Hex(),
+			Sender:         mail.Sender,
+			Receiver:       mail.Receiver,
+			Content:        mail.Content,
+			Documents:      mail.Documents,
+			ForwardedChain: mail.ForwardedChain,
+			Type:           model.EmailType(mail.Type),
+			CreatedAt:      mail.CreatedAt.Time().String(),
 		},
 	})
 	r.ObserverService.PublishMail(authedUser.Email, &model.MailBoxSubscriptionResponse{
-		Sent: &model.Mail{
-			ID:        mail.ID.Hex(),
-			Sender:    mail.Sender,
-			Receiver:  mail.Receiver,
-			Content:   mail.Content,
-			Type:      model.EmailType(mail.Type),
-			Documents: mail.Documents,
-			CreatedAt: mail.CreatedAt.Time().String(),
+		Sent: &model.Application{
+			ID:             mail.ID.Hex(),
+			Sender:         mail.Sender,
+			Receiver:       mail.Receiver,
+			ForwardedChain: mail.ForwardedChain,
+			Content:        mail.Content,
+			Type:           model.EmailType(mail.Type),
+			Documents:      mail.Documents,
+			CreatedAt:      mail.CreatedAt.Time().String(),
 		},
 	})
 
 	return &model.Application{
-		ID:            mail.ID.Hex(),
-		Sender:        mail.Sender,
-		Receiver:      mail.Receiver,
-		Content:       mail.Content,
-		Type:          model.EmailType(mail.Type),
-		PatientName:   mail.PatientName,
-		PhoneNumber:   mail.PhoneNumber,
-		Passport:      mail.Passport,
-		PatientAge:    mail.PatientAge,
-		PatientGender: mail.PatientGender,
-		Allergies:     mail.Allergies,
-		Documents:     mail.Documents,
-		CreatedAt:     mail.CreatedAt.Time().String(),
+		ID:             mail.ID.Hex(),
+		Sender:         mail.Sender,
+		Receiver:       mail.Receiver,
+		Content:        mail.Content,
+		Type:           model.EmailType(mail.Type),
+		PatientName:    mail.PatientName,
+		PhoneNumber:    mail.PhoneNumber,
+		Passport:       mail.Passport,
+		ForwardedChain: mail.ForwardedChain,
+		PatientAge:     mail.PatientAge,
+		PatientGender:  mail.PatientGender,
+		Allergies:      mail.Allergies,
+		Documents:      mail.Documents,
+		CreatedAt:      mail.CreatedAt.Time().String(),
 	}, nil
 }
 
@@ -276,7 +335,7 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 		Sender:    authedUser.Email,
 		Receiver:  input.Receiver,
 		Documents: input.Documents,
-		Type:      mail.Application,
+		Type:      mail.Normal,
 		CreatedAt: primitive.NewDateTimeFromTime(time.Now()),
 	}, user.PublicUser{
 		ID:    authedUser.ID,
@@ -289,36 +348,109 @@ func (r *mutationResolver) SendNormalMail(ctx context.Context, input model.SendN
 	}
 
 	r.ObserverService.PublishMail(input.Receiver, &model.MailBoxSubscriptionResponse{
-		Received: &model.Mail{
-			ID:        mail.ID.Hex(),
-			Sender:    mail.Sender,
-			Receiver:  mail.Receiver,
-			Content:   mail.Content,
-			Type:      model.EmailType(mail.Type),
-			Documents: mail.Documents,
-			CreatedAt: mail.CreatedAt.Time().String(),
+		Received: &model.Application{
+			ID:             mail.ID.Hex(),
+			Sender:         mail.Sender,
+			Receiver:       mail.Receiver,
+			Content:        mail.Content,
+			ForwardedChain: mail.ForwardedChain,
+			Type:           model.EmailType(mail.Type),
+			Documents:      mail.Documents,
+			CreatedAt:      mail.CreatedAt.Time().String(),
 		},
 	})
 	r.ObserverService.PublishMail(authedUser.Email, &model.MailBoxSubscriptionResponse{
-		Sent: &model.Mail{
-			ID:        mail.ID.Hex(),
-			Sender:    mail.Sender,
-			Receiver:  mail.Receiver,
-			Type:      model.EmailType(mail.Type),
-			Content:   mail.Content,
-			Documents: mail.Documents,
-			CreatedAt: mail.CreatedAt.Time().String(),
+		Sent: &model.Application{
+			ID:             mail.ID.Hex(),
+			Sender:         mail.Sender,
+			Receiver:       mail.Receiver,
+			ForwardedChain: mail.ForwardedChain,
+			Type:           model.EmailType(mail.Type),
+			Content:        mail.Content,
+			Documents:      mail.Documents,
+			CreatedAt:      mail.CreatedAt.Time().String(),
 		},
 	})
 
 	return &model.Mail{
-		ID:        mail.ID.Hex(),
-		Sender:    mail.Sender,
-		Receiver:  mail.Receiver,
-		Content:   mail.Content,
-		Type:      model.EmailType(mail.Type),
-		Documents: mail.Documents,
-		CreatedAt: mail.CreatedAt.Time().String(),
+		ID:             mail.ID.Hex(),
+		Sender:         mail.Sender,
+		Receiver:       mail.Receiver,
+		Content:        mail.Content,
+		ForwardedChain: mail.ForwardedChain,
+		Type:           model.EmailType(mail.Type),
+		Documents:      mail.Documents,
+		CreatedAt:      mail.CreatedAt.Time().String(),
+	}, nil
+}
+
+// SendInvitationMail is the resolver for the sendInvitationMail field.
+func (r *mutationResolver) SendInvitationMail(ctx context.Context, input *model.SendInvitationInput) (*model.Mail, error) {
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	receiverUser, err := r.UserService.Me(ctx, input.Receiver)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(receiverUser)
+
+	mail, err := r.MailService.SendNormalMail(ctx, &mail.Mail{
+		Content:   input.Content,
+		Sender:    authedUser.Email,
+		Receiver:  receiverUser.Email,
+		Documents: convertStringToPointerStringArray(input.Documents),
+		Type:      mail.Invitation,
+		CreatedAt: primitive.NewDateTimeFromTime(time.Now()),
+	}, user.PublicUser{
+		ID:    authedUser.ID,
+		Role:  user.Role(authedUser.Role),
+		Email: authedUser.Email,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("before publish")
+	r.ObserverService.PublishMail(receiverUser.Email, &model.MailBoxSubscriptionResponse{
+		Received: &model.Application{
+			ID:             mail.ID.Hex(),
+			Sender:         mail.Sender,
+			Receiver:       mail.Receiver,
+			Content:        mail.Content,
+			ForwardedChain: mail.ForwardedChain,
+			Type:           model.EmailType(mail.Type),
+			Documents:      mail.Documents,
+			CreatedAt:      mail.CreatedAt.Time().String(),
+		},
+	})
+	r.ObserverService.PublishMail(authedUser.Email, &model.MailBoxSubscriptionResponse{
+		Sent: &model.Application{
+			ID:             mail.ID.Hex(),
+			Sender:         mail.Sender,
+			Receiver:       mail.Receiver,
+			ForwardedChain: mail.ForwardedChain,
+			Type:           model.EmailType(mail.Type),
+			Content:        mail.Content,
+			Documents:      mail.Documents,
+			CreatedAt:      mail.CreatedAt.Time().String(),
+		},
+	})
+	fmt.Println("after publish")
+
+	return &model.Mail{
+		ID:             mail.ID.Hex(),
+		Sender:         mail.Sender,
+		Receiver:       mail.Receiver,
+		Content:        mail.Content,
+		ForwardedChain: mail.ForwardedChain,
+		Type:           model.EmailType(mail.Type),
+		Documents:      mail.Documents,
+		CreatedAt:      mail.CreatedAt.Time().String(),
 	}, nil
 }
 
@@ -398,6 +530,7 @@ func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMess
 			return nil, err
 		}
 
+		fmt.Println("published message")
 		r.ObserverService.PublishMessage(user.Email, &model.MessageSubscriptionResponse{
 			RoomID: room.ID.Hex(),
 			Message: &model.Message{
@@ -414,6 +547,87 @@ func (r *mutationResolver) SendMessage(ctx context.Context, input model.SendMess
 	}, nil
 }
 
+// ForwardMail is the resolver for the forwardMail field.
+func (r *mutationResolver) ForwardMail(ctx context.Context, mailID string, forwardTo string) (*model.Application, error) {
+	fmt.Println("in mail service")
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	_, err := r.UserService.MeByEmail(ctx, forwardTo)
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("passed me by Email")
+
+	mail, err := r.MailService.ForwardMail(ctx, forwardTo, mailID, user.PublicUser{
+		ID:    authedUser.ID,
+		Email: authedUser.Email,
+		Role:  user.Role(authedUser.Role),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println(mail)
+	fmt.Println("passed forward Mail")
+
+	r.ObserverService.PublishMail(forwardTo, &model.MailBoxSubscriptionResponse{
+		Received: &model.Application{
+			ID:             mail.ID.Hex(),
+			Content:        mail.Content,
+			PatientName:    mail.PatientName,
+			PatientAge:     mail.PatientAge,
+			PatientGender:  mail.PatientGender,
+			Passport:       mail.Passport,
+			Documents:      mail.Documents,
+			Allergies:      mail.Allergies,
+			Type:           model.EmailType(mail.Type),
+			PhoneNumber:    mail.PhoneNumber,
+			ForwardedChain: mail.ForwardedChain,
+			CreatedAt:      mail.CreatedAt.Time().String(),
+		},
+	})
+
+	r.ObserverService.PublishMail(forwardTo, &model.MailBoxSubscriptionResponse{
+		Sent: &model.Application{
+			ID:             mail.ID.Hex(),
+			Content:        mail.Content,
+			PatientName:    mail.PatientName,
+			PatientAge:     mail.PatientAge,
+			PatientGender:  mail.PatientGender,
+			Passport:       mail.Passport,
+			Documents:      mail.Documents,
+			Allergies:      mail.Allergies,
+			ForwardedChain: mail.ForwardedChain,
+			Type:           model.EmailType(mail.Type),
+			PhoneNumber:    mail.PhoneNumber,
+			CreatedAt:      mail.CreatedAt.Time().String(),
+		},
+	})
+
+	fmt.Println("passed publish mail")
+
+	return &model.Application{
+		ID:             mail.ID.Hex(),
+		Content:        mail.Content,
+		PatientName:    mail.PatientName,
+		PatientAge:     mail.PatientAge,
+		PatientGender:  mail.PatientGender,
+		Passport:       mail.Passport,
+		Documents:      mail.Documents,
+		Allergies:      mail.Allergies,
+		ForwardedChain: mail.ForwardedChain,
+		Type:           model.EmailType(mail.Type),
+		PhoneNumber:    mail.PhoneNumber,
+		CreatedAt:      mail.CreatedAt.Time().String(),
+	}, nil
+}
+
 // CreatePatient is the resolver for the createPatient field.
 func (r *mutationResolver) CreatePatient(ctx context.Context, input model.PatientInput) (*model.User, error) {
 	user, err := r.UserService.CreatePatient(ctx, user.UserInput{
@@ -423,6 +637,12 @@ func (r *mutationResolver) CreatePatient(ctx context.Context, input model.Patien
 		Password:   input.Password,
 		Role:       user.RolePatient,
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.MailService.InitializeMailBox(ctx, input.Email)
 
 	if err != nil {
 		return nil, err
@@ -456,6 +676,7 @@ func (r *mutationResolver) CloseRoom(ctx context.Context, roomid string) (*model
 	return &model.Room{
 		ID:           room.ID.Hex(),
 		Messages:     convertMessages(room.Messages),
+		State:        room.State,
 		Participants: convertParticipants(room.Participants),
 	}, nil
 }
@@ -479,6 +700,7 @@ func (r *mutationResolver) OpenRoom(ctx context.Context, roomid string) (*model.
 	return &model.Room{
 		ID:           room.ID.Hex(),
 		Messages:     convertMessages(room.Messages),
+		State:        room.State,
 		Participants: convertParticipants(room.Participants),
 	}, nil
 }
@@ -486,6 +708,62 @@ func (r *mutationResolver) OpenRoom(ctx context.Context, roomid string) (*model.
 // AddToHospital is the resolver for the addToHospital field.
 func (r *mutationResolver) AddToHospital(ctx context.Context, userMail string, hospitalID string) (*model.Hospital, error) {
 	panic("not implemented")
+}
+
+// AddReview is the resolver for the addReview field.
+func (r *mutationResolver) AddReview(ctx context.Context, content string, hospitalID string) (*model.Hospital, error) {
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	fmt.Println(authedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	_, err := r.HospitalService.AddReview(ctx, content, authedUser.ID, hospitalID, user.PublicUser{
+		ID:    authedUser.ID,
+		Role:  user.Role(authedUser.Role),
+		Email: authedUser.Email,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	hospital, err := r.HospitalService.GetHospital(ctx, hospitalID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Hospital{
+		Reviews: convertHospitalReviewsToModelReviews(hospital.Reviews),
+	}, nil
+}
+
+// AddRating is the resolver for the addRating field.
+func (r *mutationResolver) AddRating(ctx context.Context, rating int32, hospitalID string) (*model.Hospital, error) {
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	fmt.Println(authedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	hospital, err := r.HospitalService.AddRating(ctx, rating, user.PublicUser{
+		ID:    authedUser.ID,
+		Role:  user.Role(authedUser.Role),
+		Email: authedUser.Email,
+	}, hospitalID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	hospital, err = r.HospitalService.GetHospital(ctx, hospitalID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Hospital{
+		Ratings: hospital.Ratings,
+	}, nil
 }
 
 // Me is the resolver for the me field.
@@ -503,16 +781,38 @@ func (r *queryResolver) Me(ctx context.Context) (*model.User, error) {
 	}
 
 	return &model.User{
-		ID:    publicUser.ID,
-		Email: publicUser.Email,
-		Role:  model.Role(publicUser.Role),
-		Name:  publicUser.Name,
+		ID:         publicUser.ID,
+		Email:      publicUser.Email,
+		Role:       model.Role(publicUser.Role),
+		ProfilePic: publicUser.ProfilePic,
+		Name:       publicUser.Name,
 	}, nil
 }
 
 // MyDoctorProfile is the resolver for the myDoctorProfile field.
 func (r *queryResolver) MyDoctorProfile(ctx context.Context) (*model.Doctor, error) {
-	panic(fmt.Errorf("not implemented: MyDoctorProfile - myDoctorProfile"))
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	doctor, err := r.UserService.MeDoctor(ctx, authedUser.ID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Doctor{
+		User: &model.User{
+			ID:         doctor.ID.Hex(),
+			Name:       doctor.Name,
+			ProfilePic: doctor.ProfilePic,
+			Role:       model.Role(doctor.Role),
+			Email:      doctor.Email,
+		},
+		Specialty: doctor.Specialty,
+		Documents: doctor.Documents,
+	}, nil
 }
 
 // GetMailBox is the resolver for the getMailBox field.
@@ -561,6 +861,7 @@ func (r *queryResolver) GetRoom(ctx context.Context, roomID string) (*model.Room
 		ID:           room.ID.Hex(),
 		Messages:     convertMessages(room.Messages),
 		Participants: convertParticipants(room.Participants),
+		State:        room.State,
 	}, nil
 }
 
@@ -588,18 +889,56 @@ func (r *queryResolver) GetMailByID(ctx context.Context, id string) (*model.Appl
 	}
 
 	return &model.Application{
-		ID:            mail.ID.Hex(),
-		Content:       mail.Content,
-		PatientName:   mail.PatientName,
-		Passport:      mail.Passport,
-		Documents:     mail.Documents,
-		CreatedAt:     mail.CreatedAt.Time().String(),
-		Type:          model.EmailType(mail.Type),
-		Sender:        mail.Sender,
-		Receiver:      mail.Receiver,
-		PatientGender: mail.PatientGender,
-		PatientAge:    mail.PatientAge,
+		ID:             mail.ID.Hex(),
+		Content:        mail.Content,
+		PatientName:    mail.PatientName,
+		Passport:       mail.Passport,
+		Documents:      mail.Documents,
+		CreatedAt:      mail.CreatedAt.Time().String(),
+		ForwardedChain: mail.ForwardedChain,
+		Type:           model.EmailType(mail.Type),
+		Sender:         mail.Sender,
+		Receiver:       mail.Receiver,
+		PatientGender:  mail.PatientGender,
+		PatientAge:     mail.PatientAge,
 	}, err
+}
+
+// GetRoomsByID is the resolver for the getRoomsById field.
+func (r *queryResolver) GetRoomsByID(ctx context.Context) ([]*model.Room, error) {
+	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	rooms, err := r.MessagingService.GetRoomsByID(ctx, authedUser.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	var modelRooms []*model.Room
+	for _, room := range rooms {
+		modelRoom := &model.Room{
+			ID:           room.ID.Hex(),
+			Participants: make([]string, len(room.Participants)),
+			Messages:     make([]*model.Message, len(room.Messages)),
+		}
+
+		for i, participant := range room.Participants {
+			modelRoom.Participants[i] = participant.Hex()
+		}
+
+		for i, msg := range room.Messages {
+			modelRoom.Messages[i] = &model.Message{
+				Content: msg.Content,
+				Author:  msg.Author,
+			}
+		}
+
+		modelRooms = append(modelRooms, modelRoom)
+	}
+
+	return modelRooms, nil
 }
 
 // GetOrderID is the resolver for the getOrderId field.
@@ -631,10 +970,10 @@ func (r *queryResolver) GetHospital(ctx context.Context) (*model.Hospital, error
 		if err != nil {
 			return nil, err
 		}
-
 		return &model.Hospital{
+			ID: hospital.ID.Hex(),
 			Participants: &model.Participants{
-				Roots:   convertParticipants(hospital.Participants.Roots),
+				Roots:   convertParticipants(hospital.Participants.RootUsers),
 				Staff:   convertParticipants(hospital.Participants.Staff),
 				Doctors: convertParticipants(hospital.Participants.Doctors),
 			},
@@ -646,8 +985,9 @@ func (r *queryResolver) GetHospital(ctx context.Context) (*model.Hospital, error
 		}
 
 		return &model.Hospital{
+			ID: hospital.ID.Hex(),
 			Participants: &model.Participants{
-				Roots:   convertParticipants(hospital.Participants.Roots),
+				Roots:   convertParticipants(hospital.Participants.RootUsers),
 				Staff:   convertParticipants(hospital.Participants.Staff),
 				Doctors: convertParticipants(hospital.Participants.Doctors),
 			},
@@ -659,8 +999,9 @@ func (r *queryResolver) GetHospital(ctx context.Context) (*model.Hospital, error
 		}
 
 		return &model.Hospital{
+			ID: hospital.ID.Hex(),
 			Participants: &model.Participants{
-				Roots:   convertParticipants(hospital.Participants.Roots),
+				Roots:   convertParticipants(hospital.Participants.RootUsers),
 				Staff:   convertParticipants(hospital.Participants.Staff),
 				Doctors: convertParticipants(hospital.Participants.Doctors),
 			},
@@ -669,6 +1010,117 @@ func (r *queryResolver) GetHospital(ctx context.Context) (*model.Hospital, error
 		return nil, errors.New("invalid role")
 
 	}
+}
+
+// GetDoctorByID is the resolver for the getDoctorByID field.
+func (r *queryResolver) GetDoctorByID(ctx context.Context, doctorID string) (*model.Doctor, error) {
+	_, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+
+	doctor, err := r.UserService.MeDoctor(ctx, doctorID)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Doctor{
+		User: &model.User{
+			ID:         doctor.ID.Hex(),
+			Name:       doctor.Name,
+			Email:      doctor.Email,
+			Role:       model.Role(doctor.Role),
+			ProfilePic: doctor.ProfilePic,
+		},
+		Specialty: doctor.Specialty,
+		Documents: doctor.Documents,
+	}, nil
+}
+
+// GetHospitalByID is the resolver for the getHospitalByID field.
+func (r *queryResolver) GetHospitalByID(ctx context.Context, hospitalID string) (*model.Hospital, error) {
+	_, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+	hospital, err := r.HospitalService.GetHospital(ctx, hospitalID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.Hospital{
+		ID: hospital.ID.Hex(),
+		BasicInfo: &model.BasicInfo{
+			HospitalName:       &hospital.BasicInfo.HospitalName,
+			RegistrationNumber: &hospital.BasicInfo.RegistrationNumber,
+			AddressInformation: &model.AddressInformation{
+				StreetAddress: &hospital.BasicInfo.AddressInformation.StreetAddress,
+				City:          &hospital.BasicInfo.AddressInformation.City,
+				State:         &hospital.BasicInfo.AddressInformation.State,
+				PinCode:       &hospital.BasicInfo.AddressInformation.PinCode,
+			},
+			ContactInformation: &model.ContactInformation{
+				ContactPersonName: &hospital.BasicInfo.ContactInformation.ContactPersonName,
+				ContactNumber:     &hospital.BasicInfo.ContactInformation.ContactNumber,
+				ContactEmail:      &hospital.BasicInfo.ContactInformation.ContactEmail,
+				Website:           &hospital.BasicInfo.ContactInformation.Website,
+			},
+			OperatingHours: &model.OperatingHours{
+				OpeningTime: &hospital.BasicInfo.OperatingHours.OpeningTime,
+				ClosingTime: &hospital.BasicInfo.OperatingHours.ClosingTime,
+			},
+		},
+		Media: &model.Media{
+			FrontURL:     &hospital.Media.FrontUrl,
+			ReceptionURL: &hospital.Media.ReceptionUrl,
+			OperationURL: &hospital.Media.OperationUrl,
+		},
+		Amenities: &model.Amenities{
+			BedCapacity: &model.BedCapacity{
+				GeneralWardBeds: &hospital.Amenities.BedCapacity.GeneralWardBeds,
+				PrivateRoomBeds: &hospital.Amenities.BedCapacity.PrivateRoomBeds,
+				EmergencyBeds:   &hospital.Amenities.BedCapacity.EmergencyBeds,
+				IcuBeds:         &hospital.Amenities.BedCapacity.IcuBeds,
+			},
+			MedicalStaff: &model.MedicalStaff{
+				PermenantDoctors:    &hospital.Amenities.MedicalStaff.PermenantDoctors,
+				VisitingConsultants: &hospital.Amenities.MedicalStaff.VisitingConsultants,
+				Nurses:              &hospital.Amenities.MedicalStaff.Nurses,
+				SupportStaff:        &hospital.Amenities.MedicalStaff.SupportStaff,
+			},
+			Facilities:     convertStringToPointerStringArray(hospital.Amenities.Facilities),
+			Specialization: convertStringToPointerStringArray(hospital.Amenities.Specialization),
+		},
+		Reviews:         convertHospitalReviewsToModelReviews(hospital.Reviews),
+		PatientRating:   &hospital.PatientRating,
+		Ratings:         hospital.Ratings,
+		ConsultationFee: &hospital.ConsultationFee,
+		Participants: &model.Participants{
+			Roots:   convertParticipants(hospital.Participants.RootUsers),
+			Staff:   convertParticipants(hospital.Participants.Staff),
+			Doctors: convertParticipants(hospital.Participants.Doctors),
+		},
+	}, nil
+}
+
+// GetUserByID is the resolver for the getUserByID field.
+func (r *queryResolver) GetUserByID(ctx context.Context, userID string) (*model.User, error) {
+	_, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
+	if !ok {
+		return nil, fmt.Errorf("unauthorized: user not found in context")
+	}
+	user, err := r.UserService.Me(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &model.User{
+		ID:         user.ID,
+		Email:      user.Email,
+		Name:       user.Name,
+		ProfilePic: user.ProfilePic,
+	}, nil
 }
 
 // MailBoxSubscription is the resolver for the MailBoxSubscription field.
@@ -684,7 +1136,7 @@ func (r *subscriptionResolver) MailBoxSubscription(ctx context.Context) (<-chan 
 
 // MessageBoxSubscription is the resolver for the MessageBoxSubscription field.
 func (r *subscriptionResolver) MessageBoxSubscription(ctx context.Context) (<-chan *model.MessageSubscriptionResponse, error) {
-	fmt.Println("called")
+	fmt.Println("message box subscription was called")
 	authedUser, ok := ctx.Value(UserContextKey).(AuthenticatedUser)
 	if !ok {
 		return nil, fmt.Errorf("unauthorized: user not found in context")

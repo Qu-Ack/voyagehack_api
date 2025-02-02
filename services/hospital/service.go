@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/Qu-Ack/voyagehack_api/services/user"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -83,4 +84,36 @@ func (h *HospitalService) CheckParticpant(ctx context.Context, participantType s
 		return nil, errors.New("participant Type should be Valid")
 
 	}
+}
+
+func (h *HospitalService) AddReview(ctx context.Context, content string, author string, hospitalId string, requester user.PublicUser) (*Hospital, error) {
+	if requester.Role != user.RolePatient {
+		return nil, errors.New("only patients can add reviews")
+	}
+
+	authorObjectId, err := primitive.ObjectIDFromHex(author)
+	if err != nil {
+		return nil, err
+	}
+	hospitalObjectId, err := primitive.ObjectIDFromHex(hospitalId)
+
+	return h.repo.addReview(ctx, &Review{
+		Content: content,
+		Author:  authorObjectId,
+	}, hospitalObjectId)
+}
+
+func (h *HospitalService) AddRating(ctx context.Context, rating int32, requester user.PublicUser, hospitalId string) (*Hospital, error) {
+	if requester.Role != user.RolePatient {
+		return nil, errors.New("only patients can add ratings")
+	}
+
+	hospitalObjectId, err := primitive.ObjectIDFromHex(hospitalId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return h.repo.addRating(ctx, rating, hospitalObjectId)
+
 }

@@ -3,6 +3,8 @@ package mail
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -20,6 +22,7 @@ func NewMailRepo(db *mongo.Database) *MailRepo {
 }
 
 func (m *MailRepo) createEmail(ctx context.Context, mail *Mail) (*Mail, error) {
+	fmt.Println("in create email")
 	mailCollection := m.db.Collection("mails")
 
 	insertOneResult, err := mailCollection.InsertOne(ctx, mail)
@@ -59,7 +62,20 @@ func (m *MailRepo) findMailBox(ctx context.Context, emailId string) (*MailBox, e
 	return &mailBox, nil
 }
 
+func (m *MailRepo) addForwarded(ctx context.Context, forwardedTo string, mailId primitive.ObjectID) error {
+	mailBoxCollection := m.db.Collection("mails")
+
+	result := mailBoxCollection.FindOneAndUpdate(ctx, bson.M{"_id": mailId}, bson.D{{"$push", bson.D{{"forwardedChain", forwardedTo}}}})
+
+	if result.Err() != nil {
+		return result.Err()
+	}
+
+	return nil
+}
+
 func (m *MailRepo) AddMailToSent(ctx context.Context, mailId string, mail primitive.ObjectID) error {
+	fmt.Println("add mails to sent")
 	mailBoxCollection := m.db.Collection("mailbox")
 
 	result := mailBoxCollection.FindOneAndUpdate(ctx, bson.M{"email": mailId}, bson.D{{"$push", bson.D{{"sent", mail}}}})
@@ -72,6 +88,7 @@ func (m *MailRepo) AddMailToSent(ctx context.Context, mailId string, mail primit
 }
 
 func (m *MailRepo) AddMailToReceived(ctx context.Context, mailId string, mail primitive.ObjectID) error {
+	fmt.Println("add mails to received")
 	mailBoxCollection := m.db.Collection("mailbox")
 
 	result := mailBoxCollection.FindOneAndUpdate(ctx, bson.M{"email": mailId}, bson.D{{"$push", bson.D{{"received", mail}}}})
@@ -81,6 +98,26 @@ func (m *MailRepo) AddMailToReceived(ctx context.Context, mailId string, mail pr
 	}
 
 	return nil
+}
+
+func (m *MailRepo) checkUserInMail(ctx context.Context, emailId string, mailId primitive.ObjectID) error {
+	mailBoxCollection := m.db.Collection("mailbox")
+
+	var mail Mail
+	err := mailBoxCollection.FindOne(ctx, bson.M{"_id": mailId}).Decode(&mail)
+
+	if err != nil {
+		return err
+	}
+
+	if mail.Sender == string(emailId) || mail.Receiver == string(emailId) {
+		return nil
+	} else if slices.Contains(mail.ForwardedChain, emailId) {
+		return nil
+	} else {
+		return errors.New("can't forward mail")
+	}
+
 }
 
 func (m *MailRepo) createMailBox(ctx context.Context, mailId string) (*MailBox, error) {

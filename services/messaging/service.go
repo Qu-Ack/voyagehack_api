@@ -87,7 +87,16 @@ func (m *MessagingService) SendMessage(ctx context.Context, roomId string, reque
 	}
 
 	if slices.Contains(room.Participants, userObjectId) {
-		return m.repo.addMessage(ctx, roomObjectId, message)
+		_, err := m.repo.addMessage(ctx, roomObjectId, message)
+		if err != nil {
+			return nil, err
+		}
+
+		room, err = m.repo.getRoom(ctx, roomObjectId)
+		if err != nil {
+			return nil, err
+		}
+		return room, nil
 	} else {
 		return nil, errors.New("requester should be part of the room")
 	}
@@ -109,12 +118,32 @@ func (m *MessagingService) GetRoom(ctx context.Context, roomId string, requester
 		return nil, err
 	}
 
+	if room.State == "CLOSE" {
+		return nil, errors.New("room is closed")
+	}
+
 	if slices.Contains(room.Participants, userObjectId) {
 		return room, nil
 	} else {
 		return nil, errors.New("Participant should be inside the room")
 	}
 
+}
+
+func (m *MessagingService) GetRoomsByID(ctx context.Context, userId string) ([]*Room, error) {
+
+	userObjectId, err := primitive.ObjectIDFromHex(userId)
+	if err != nil {
+		return nil, err
+	}
+
+	rooms, err := m.repo.getRoomsById(ctx, userObjectId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return rooms, nil
 }
 
 func (m *MessagingService) ChangeRoomState(ctx context.Context, state string, requester user.PublicUser, roomId string) (*Room, error) {

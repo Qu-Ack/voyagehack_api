@@ -42,6 +42,21 @@ func (u *UserService) CreateRoot(ctx context.Context, userInput UserInput, reque
 	return u.repo.createUser(ctx, userInput)
 }
 
+func (u *UserService) CreateDoctor(ctx context.Context, doctorInput DoctorInput, requester PublicUser) (*PublicDoctor, error) {
+	_, err := u.repo.getUserByEmail(ctx, doctorInput.Email)
+
+	if err == nil {
+		return nil, errors.New("user already exists")
+	}
+	if requester.Role != RoleRoot {
+		return nil, errors.New("Only root users can create other root users")
+	}
+
+	doctorInput.Role = RoleDoctor
+
+	return u.repo.createDoctor(ctx, doctorInput)
+}
+
 func (u *UserService) CreateStaff(ctx context.Context, userInput UserInput, requester PublicUser) (*PublicUser, error) {
 	_, err := u.repo.getUserByEmail(ctx, userInput.Email)
 
@@ -108,6 +123,22 @@ func (u *UserService) Me(ctx context.Context, userId string) (*PublicUser, error
 	}
 
 	return user, nil
+}
+
+func (u *UserService) MeDoctor(ctx context.Context, doctorId string) (*PublicDoctor, error) {
+	DoctorObjectId, err := primitive.ObjectIDFromHex(doctorId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	doctor, err := u.repo.getDoctorByID(ctx, DoctorObjectId)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return doctor, nil
 }
 
 func (u *UserService) MeByEmail(ctx context.Context, userEmail string) (*PublicUser, error) {

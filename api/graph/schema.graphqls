@@ -31,7 +31,12 @@ input LoginInput {
 input DoctorInput {
   specialty: String!
   documents: [String!]!
-  userId: ID!  # Reference to existing user
+  name: String!
+	password: String!
+  email: String!
+  hospitalId: String!
+  profilePic: String!
+ 
 }
 
 input UserInput {
@@ -78,6 +83,7 @@ type Mail {
   content: String!
   documents: [String]!
   type: EmailType!
+  ForwardedChain: [String!]!
   createdAt: String!
 }
 
@@ -109,6 +115,7 @@ type Application {
   phoneNumber: String!
   allergies: String!
   type: EmailType!
+  ForwardedChain: [String!]!
   createdAt: String!
 }
 
@@ -118,10 +125,17 @@ input sendNormalMailInput {
   documents: [String]
 }
 
+input sendInvitationInput {
+  receiver: String! 
+  content: String!
+  documents: [String!]!
+}
+
 type Room {
   id: ID! 
   messages: [Message]!
   participants: [ID!]!
+  state: String!
 }
 
 type Message {
@@ -134,8 +148,91 @@ input sendMessageInput {
  roomId: String!
 }
 
+type Review {
+  content: String!
+  author: String!
+}
+
 type Hospital {
-  participants: Participants 
+  id: ID!
+  basicInfo: BasicInfo
+  media: Media
+  amenities: Amenities
+  onSiteVerification: OnSiteVerification
+  onsiteRating: Int
+  reviews: [Review!]!
+  patientRating: Int
+  ratings: [Int!]!
+  consultationFee: Int
+  participants: Participants
+}
+
+type BasicInfo {
+  hospitalName: String
+  registrationNumber: String
+  contactInformation: ContactInformation
+  addressInformation: AddressInformation
+  operatingHours: OperatingHours
+}
+
+type ContactInformation {
+  contactPersonName: String
+  contactNumber: String
+  contactEmail: String
+  website: String
+}
+
+type AddressInformation {
+  streetAddress: String
+  city: String
+  state: String
+  pinCode: String
+}
+
+type OperatingHours {
+  openingTime: String
+  closingTime: String
+}
+
+type Media {
+  frontUrl: String
+  receptionUrl: String
+  operationUrl: String
+}
+
+type Amenities {
+  bedCapacity: BedCapacity
+  medicalStaff: MedicalStaff
+  facilities: [String]
+  specialization: [String]
+}
+
+type BedCapacity {
+  generalWardBeds: Int
+  privateRoomBeds: Int
+  emergencyBeds: Int
+  icuBeds: Int
+}
+
+
+type MedicalStaff {
+  permenantDoctors: Int
+  visitingConsultants: Int
+  nurses: Int
+  supportStaff: Int
+}
+
+type OnSiteVerification {
+  preferredDate: String
+  preferredTime: String
+  verificationContact: VerificationContact
+}
+
+type VerificationContact {
+  name: String
+  position: String
+  phoneNumber: String
+  alternatePhone: String
 }
 
 type Participants {
@@ -151,8 +248,12 @@ type Query {
   getRoom(roomId: String!): Room!
   getS3Url: String!
   getMailById(id: String!): Application!
+  getRoomsById: [Room!]!
   getOrderId: String!
   getHospital: Hospital!
+  getDoctorByID(doctorId: String!): Doctor!
+  getHospitalByID(hospitalId: String!): Hospital!
+	getUserByID(userId: String!): User!
 }
 
 type Mutation {
@@ -163,17 +264,21 @@ type Mutation {
   createTestUser(input:TestUserInput!): User!
   sendApplication(input:sendMailInput!): Application!
   sendNormalMail(input:sendNormalMailInput!): Mail!
+  sendInvitationMail(input: sendInvitationInput): Mail!
   startChat(particpantMail: String!): Room!
   sendMessage(input:sendMessageInput!): Room!
+  forwardMail(mailId: String!, forwardTo: String!): Application!
   createPatient(input:PatientInput!): User!
   closeRoom(roomid: String!): Room!
   openRoom(roomid: String!): Room!
   addToHospital(userMail: String!, hospitalId: String!):Hospital!
+	addReview(content: String!, hospitalId: String!): Hospital!
+	addRating(rating: Int!, hospitalId: String!): Hospital!
 }
 
 type MailBoxSubscriptionResponse {
-  sent: Mail  
-  received: Mail
+  sent: Application  
+  received: Application
 }
 
 type MessageSubscriptionResponse {

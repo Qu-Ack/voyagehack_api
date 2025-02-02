@@ -13,6 +13,7 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/Qu-Ack/voyagehack_api/api/graph"
+	"github.com/Qu-Ack/voyagehack_api/services/hospital"
 	"github.com/Qu-Ack/voyagehack_api/services/mail"
 	"github.com/Qu-Ack/voyagehack_api/services/messaging"
 	"github.com/Qu-Ack/voyagehack_api/services/observers"
@@ -72,6 +73,8 @@ func New() (*http.Server, error) {
 	paymentService := payment.NewPaymentService()
 
 	uploadService, err := upload.NewUploadService()
+	hospitalRepo := hospital.NewHospitalRepo(db)
+	hospitalService := hospital.NewHospitalService(hospitalRepo)
 
 	if err != nil {
 		fmt.Println(err)
@@ -86,6 +89,7 @@ func New() (*http.Server, error) {
 			PaymentService:   paymentService,
 			MailService:      mailService,
 			MessagingService: messageService,
+			HospitalService:  hospitalService,
 			UploadService:    uploadService,
 		},
 	}))
@@ -100,10 +104,8 @@ func New() (*http.Server, error) {
 		},
 		InitFunc: func(ctx context.Context, initPayload transport.InitPayload) (context.Context, *transport.InitPayload, error) {
 			// Try to get token from payload
-			fmt.Println("web socket middleware called")
 			if auth, ok := initPayload["Authorization"].(string); ok {
 				token := strings.TrimPrefix(auth, "Bearer ")
-				fmt.Println(token)
 
 				// Validate token
 				parsedToken, err := jwt.Parse(token, func(t *jwt.Token) (interface{}, error) {
@@ -149,6 +151,7 @@ func New() (*http.Server, error) {
 	router.GET("/", func(c *gin.Context) {
 		playground.Handler("GraphQL Playground", "/query").ServeHTTP(c.Writer, c.Request)
 	})
+	router.POST("/upload", HandleGetS3Url)
 	router.POST("/query", func(c *gin.Context) {
 		srv.ServeHTTP(c.Writer, c.Request)
 	})

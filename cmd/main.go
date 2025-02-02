@@ -15,7 +15,7 @@ import (
 func main() {
 	// Set MongoDB environment variables
 	os.Setenv("MONGO_URI", "mongodb+srv://dakshsangal:amqp4fJNIIsZvGMW@cluster0.ek1fe.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
-	os.Setenv("MONGO_DB", "voyage2")
+	os.Setenv("MONGO_DB", "voyage3")
 	os.Setenv("RAZORPAY_KEY", "rzp_test_gAYUMrSonSX23v")
 	os.Setenv("RAZORPAY_SECRET", "r5kVzNMXSFoZKZcRf1ypULDu")
 

@@ -69,6 +69,7 @@ func (m *MessageRepo) addMessage(ctx context.Context, roomId primitive.ObjectID,
 
 	var room Room
 	err := chatCollection.FindOneAndUpdate(ctx, bson.M{"_id": roomId}, bson.D{{"$push", bson.D{{"messages", message}}}}).Decode(&room)
+	fmt.Println(room)
 
 	if err != nil {
 		return nil, err
@@ -76,6 +77,32 @@ func (m *MessageRepo) addMessage(ctx context.Context, roomId primitive.ObjectID,
 
 	return &room, nil
 
+}
+
+func (m *MessageRepo) getRoomsById(ctx context.Context, resourceId primitive.ObjectID) ([]*Room, error) {
+	chatCollection := m.db.Collection("chat")
+
+	cursor, err := chatCollection.Find(ctx, bson.M{"participants": resourceId})
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var rooms []*Room
+	for cursor.Next(ctx) {
+		var room Room
+		if err := cursor.Decode(&room); err != nil {
+			return nil, err
+		}
+		rooms = append(rooms, &room)
+	}
+
+	// Check for errors after iteration
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+
+	return rooms, nil
 }
 
 func (m *MessageRepo) getRoom(ctx context.Context, roomId primitive.ObjectID) (*Room, error) {
